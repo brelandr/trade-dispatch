@@ -25,6 +25,10 @@ class TRDSP_Activator {
 				'delete_data_on_uninstall' => false,
 				'notify_email'             => '',
 				'business_name'            => '',
+				'booking_hours_hint'       => '',
+				'booking_open'             => '',
+				'booking_close'            => '',
+				'booking_days'             => array(),
 			),
 			'',
 			false
@@ -33,6 +37,7 @@ class TRDSP_Activator {
 		if ( ! wp_next_scheduled( 'trdsp_cron_recurring_jobs' ) ) {
 			wp_schedule_event( time(), 'daily', 'trdsp_cron_recurring_jobs' );
 		}
+		TRDSP_Roles::register();
 	}
 
 	/**
@@ -68,6 +73,7 @@ class TRDSP_Activator {
 			id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
 			customer_id bigint(20) UNSIGNED NOT NULL DEFAULT 0,
 			assigned_user_id bigint(20) UNSIGNED NOT NULL DEFAULT 0,
+			service_id bigint(20) UNSIGNED NOT NULL DEFAULT 0,
 			title varchar(191) NOT NULL DEFAULT '',
 			status varchar(32) NOT NULL DEFAULT 'scheduled',
 			scheduled_at datetime NULL,

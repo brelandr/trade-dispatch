@@ -49,7 +49,11 @@ class TRDSP_Plugin {
 		add_action( 'admin_init', array( $this, 'register_privacy' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'register_public_assets' ) );
 		add_action( 'trdsp_cron_recurring_jobs', array( 'TRDSP_Jobs', 'generate_due_occurrences' ) );
+		add_action( 'trdsp_cron_recurring_jobs', array( 'TRDSP_Mail', 'send_tomorrow_crew_digests' ) );
+		TRDSP_Roles::hooks();
 		TRDSP_Mail::hooks();
+		TRDSP_Requests::hooks();
+		TRDSP_Email_Templates::hooks();
 		TRDSP_Privacy::hooks();
 		TRDSP_Booking::hooks();
 		TRDSP_Services::hooks();
@@ -71,6 +75,13 @@ class TRDSP_Plugin {
 			TRDSP_PLUGIN_URL . 'assets/css/trdsp-public.css',
 			array(),
 			TRDSP_VERSION
+		);
+		wp_register_script(
+			'trdsp-booking',
+			TRDSP_PLUGIN_URL . 'assets/js/trdsp-booking.js',
+			array(),
+			TRDSP_VERSION,
+			true
 		);
 	}
 
@@ -100,7 +111,7 @@ class TRDSP_Plugin {
 		if ( ! function_exists( 'wp_add_privacy_policy_content' ) ) {
 			return;
 		}
-		$content = '<p>' . esc_html__( 'Trade Dispatch stores customer names, contact details, job addresses, service notes, estimates, and a WordPress subscriber account (created on first booking) on this site so the business can schedule work and the customer can open the portal. Booking form submissions are emailed to the site owner with WordPress mail. Data stays on this WordPress installation unless the site owner connects a separately installed premium add-on.', 'trade-dispatch' ) . '</p>';
+		$content = '<p>' . esc_html__( 'Trade Dispatch stores customer names, contact details, job addresses, service notes, estimates, and a WordPress account (Customer role on first booking, or an existing Subscriber) on this site so the business can schedule work and the customer can open the portal. Optional Employee and Dispatcher roles let crew work assigned jobs or run the office without editing pages or plugins. Booking form submissions are emailed to the site owner with WordPress mail. Assigned crew members may receive a tomorrow job list (title, time, and address) at their WordPress user email. Data stays on this WordPress installation unless the site owner connects a separately installed premium add-on.', 'trade-dispatch' ) . '</p>';
 		wp_add_privacy_policy_content( 'Trade Dispatch', wp_kses_post( $content ) );
 	}
 }

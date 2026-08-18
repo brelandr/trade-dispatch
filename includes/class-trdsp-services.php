@@ -21,6 +21,33 @@ class TRDSP_Services {
 		add_action( 'admin_menu', array( __CLASS__, 'register_menu' ), 15 );
 		add_action( 'admin_post_trdsp_save_service', array( __CLASS__, 'handle_save' ) );
 		add_action( 'admin_post_trdsp_delete_service', array( __CLASS__, 'handle_delete' ) );
+		add_filter( 'trdsp_job_overlap_minutes', array( __CLASS__, 'overlap_minutes' ), 10, 4 );
+	}
+
+	/**
+	 * Use the job's service default duration for overlap warnings.
+	 *
+	 * @param int    $minutes      Default minutes.
+	 * @param int    $user_id      Assignee.
+	 * @param string $scheduled_at Datetime.
+	 * @param int    $job_id       Job being saved.
+	 * @return int
+	 */
+	public static function overlap_minutes( $minutes, $user_id, $scheduled_at, $job_id ) {
+		unset( $user_id, $scheduled_at );
+		$job_id = absint( $job_id );
+		if ( $job_id < 1 || ! class_exists( 'TRDSP_Jobs' ) ) {
+			return absint( $minutes );
+		}
+		$job = TRDSP_Jobs::get( $job_id );
+		if ( ! $job || empty( $job['service_id'] ) ) {
+			return absint( $minutes );
+		}
+		$service = self::get( (int) $job['service_id'] );
+		if ( $service && (int) $service['default_minutes'] >= 15 ) {
+			return (int) $service['default_minutes'];
+		}
+		return absint( $minutes );
 	}
 
 	/**
@@ -72,7 +99,7 @@ class TRDSP_Services {
 			'trade-dispatch',
 			__( 'Services', 'trade-dispatch' ),
 			__( 'Services', 'trade-dispatch' ),
-			'manage_options',
+			'trdsp_manage_jobs',
 			'trade-dispatch-services',
 			array( __CLASS__, 'render_page' )
 		);
@@ -85,7 +112,7 @@ class TRDSP_Services {
 		if ( ! isset( $_POST['trdsp_service_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['trdsp_service_nonce'] ) ), 'trdsp_save_service' ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! TRDSP_Roles::can_manage_office() ) {
 			wp_die( esc_html__( 'Unauthorized.', 'trade-dispatch' ) );
 		}
 		global $wpdb;
@@ -125,7 +152,7 @@ class TRDSP_Services {
 		if ( ! isset( $_POST['trdsp_service_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['trdsp_service_nonce'] ) ), 'trdsp_delete_service' ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! TRDSP_Roles::can_manage_office() ) {
 			wp_die( esc_html__( 'Unauthorized.', 'trade-dispatch' ) );
 		}
 		global $wpdb;
@@ -142,7 +169,7 @@ class TRDSP_Services {
 	 * Admin page.
 	 */
 	public static function render_page() {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! TRDSP_Roles::can_manage_office() ) {
 			wp_die( esc_html__( 'You do not have permission to access this page.', 'trade-dispatch' ) );
 		}
 		$edit_id = isset( $_GET['edit'] ) ? absint( wp_unslash( $_GET['edit'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- View only.

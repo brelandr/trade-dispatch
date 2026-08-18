@@ -144,6 +144,48 @@ class TRDSP_Jobs {
 	}
 
 	/**
+	 * Public booking hints: date + time only (no customer or address).
+	 *
+	 * @param string $from GMT datetime.
+	 * @param string $to   GMT datetime.
+	 * @return array<int,array<string,string>>
+	 */
+	public static function public_busy_times( $from, $to ) {
+		$out = array();
+		foreach ( array( 'scheduled', 'in_progress' ) as $status ) {
+			foreach ( self::query(
+				array(
+					'status' => $status,
+					'from'   => $from,
+					'to'     => $to,
+					'limit'  => 100,
+				)
+			) as $job ) {
+				if ( empty( $job['scheduled_at'] ) ) {
+					continue;
+				}
+				$ts = strtotime( (string) $job['scheduled_at'] );
+				if ( false === $ts ) {
+					continue;
+				}
+				$out[] = array(
+					'date' => wp_date( 'Y-m-d', $ts ),
+					'time' => wp_date( 'H:i', $ts ),
+				);
+			}
+		}
+		usort(
+			$out,
+			static function ( $a, $b ) {
+				$left  = $a['date'] . $a['time'];
+				$right = $b['date'] . $b['time'];
+				return $left === $right ? 0 : ( $left < $right ? -1 : 1 );
+			}
+		);
+		return $out;
+	}
+
+	/**
 	 * Insert or update a job.
 	 *
 	 * @param array<string,mixed> $data Job data.
@@ -168,6 +210,7 @@ class TRDSP_Jobs {
 		$row = array(
 			'customer_id'      => absint( $data['customer_id'] ?? 0 ),
 			'assigned_user_id' => absint( $data['assigned_user_id'] ?? 0 ),
+			'service_id'       => absint( $data['service_id'] ?? 0 ),
 			'title'            => sanitize_text_field( (string) ( $data['title'] ?? '' ) ),
 			'status'           => $status,
 			'scheduled_at'     => $scheduled_at,
@@ -210,7 +253,7 @@ class TRDSP_Jobs {
 				self::table(),
 				$row,
 				array( 'id' => $id ),
-				array( '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ),
+				array( '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ),
 				array( '%d' )
 			);
 			if ( false === $updated ) {
@@ -222,7 +265,7 @@ class TRDSP_Jobs {
 			$inserted = $wpdb->insert(
 				self::table(),
 				$row,
-				array( '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+				array( '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
 			);
 			if ( false === $inserted ) {
 				return new WP_Error( 'trdsp_job_insert', __( 'Could not create job.', 'trade-dispatch' ) );
@@ -257,6 +300,17 @@ class TRDSP_Jobs {
 			if ( '' !== $row['recurrence'] && ! empty( $row['scheduled_at'] ) ) {
 				self::create_next_occurrence( $id, $row );
 			}
+		}
+
+		if ( $previous && 'requested' === $previous['status'] && 'scheduled' === $row['status'] ) {
+			/**
+			 * Fires when a booking request is confirmed (requested → scheduled).
+			 *
+			 * @param int                  $id       Job ID.
+			 * @param array<string,mixed> $row      Saved row.
+			 * @param array<string,mixed> $previous Previous row.
+			 */
+			do_action( 'trdsp_job_confirmed', $id, $row, $previous );
 		}
 
 		return $id;
@@ -348,6 +402,70 @@ class TRDSP_Jobs {
 	}
 
 	/**
+	 * Other jobs for the same crew that overlap a time window.
+	 *
+	 * Warning helper only — does not block a save.
+	 *
+	 * @param int    $user_id      Assignee.
+	 * @param string $scheduled_at Datetime.
+	 * @param int    $exclude_id   Job to ignore.
+	 * @return array<int,array<string,mixed>>
+	 */
+	public static function overlaps_for_assignee( $user_id, $scheduled_at, $exclude_id = 0 ) {
+		$user_id      = absint( $user_id );
+		$scheduled_at = sanitize_text_field( (string) $scheduled_at );
+		$exclude_id   = absint( $exclude_id );
+		if ( $user_id < 1 || '' === $scheduled_at ) {
+			return array();
+		}
+		$start = strtotime( $scheduled_at . ' UTC' );
+		if ( ! $start ) {
+			$start = strtotime( $scheduled_at );
+		}
+		if ( ! $start ) {
+			return array();
+		}
+		$minutes = absint( apply_filters( 'trdsp_job_overlap_minutes', 60, $user_id, $scheduled_at, $exclude_id ) );
+		if ( $minutes < 15 ) {
+			$minutes = 60;
+		}
+		$day  = gmdate( 'Y-m-d', $start );
+		$rows = self::query(
+			array(
+				'assigned_user_id' => $user_id,
+				'from'             => $day . ' 00:00:00',
+				'to'               => $day . ' 23:59:59',
+				'limit'            => 50,
+			)
+		);
+		$end  = $start + ( $minutes * MINUTE_IN_SECONDS );
+		$hits = array();
+		foreach ( $rows as $row ) {
+			if ( (int) $row['id'] === $exclude_id ) {
+				continue;
+			}
+			if ( in_array( (string) $row['status'], array( 'completed', 'cancelled' ), true ) ) {
+				continue;
+			}
+			if ( empty( $row['scheduled_at'] ) ) {
+				continue;
+			}
+			$other = strtotime( (string) $row['scheduled_at'] . ' UTC' );
+			if ( ! $other ) {
+				$other = strtotime( (string) $row['scheduled_at'] );
+			}
+			if ( ! $other ) {
+				continue;
+			}
+			$other_end = $other + ( $minutes * MINUTE_IN_SECONDS );
+			if ( $start < $other_end && $end > $other ) {
+				$hits[] = $row;
+			}
+		}
+		return $hits;
+	}
+
+	/**
 	 * Create the next recurring job.
 	 *
 	 * @param int                  $source_id Source job ID.
@@ -391,5 +509,100 @@ class TRDSP_Jobs {
 			}
 			self::create_next_occurrence( (int) $job['id'], $job );
 		}
+	}
+
+	/**
+	 * Portal-requested preferred time (not a schema column).
+	 *
+	 * @return string
+	 */
+	protected static function preferred_option_key() {
+		return 'trdsp_preferred_times';
+	}
+
+	/**
+	 * Preferred datetime string for a job, if the customer requested one.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return string
+	 */
+	public static function get_preferred_at( $job_id ) {
+		$job_id = absint( $job_id );
+		$all    = get_option( self::preferred_option_key(), array() );
+		if ( ! is_array( $all ) || $job_id < 1 ) {
+			return '';
+		}
+		$key = (string) $job_id;
+		if ( ! isset( $all[ $key ] ) && ! isset( $all[ $job_id ] ) ) {
+			return '';
+		}
+		$raw = isset( $all[ $key ] ) ? $all[ $key ] : $all[ $job_id ];
+		return sanitize_text_field( (string) $raw );
+	}
+
+	/**
+	 * Store or clear a portal preferred time.
+	 *
+	 * @param int    $job_id Job ID.
+	 * @param string $value  Datetime-local or empty to clear.
+	 */
+	public static function set_preferred_at( $job_id, $value ) {
+		$job_id = absint( $job_id );
+		if ( $job_id < 1 ) {
+			return;
+		}
+		$all = get_option( self::preferred_option_key(), array() );
+		if ( ! is_array( $all ) ) {
+			$all = array();
+		}
+		$key   = (string) $job_id;
+		$value = sanitize_text_field( (string) $value );
+		if ( '' === $value ) {
+			unset( $all[ $key ], $all[ $job_id ] );
+		} else {
+			$all[ $key ] = $value;
+		}
+		update_option( self::preferred_option_key(), $all, false );
+	}
+
+	/**
+	 * Job IDs with an outstanding portal time request.
+	 *
+	 * @return array<int,int>
+	 */
+	public static function list_preferred_job_ids() {
+		$all = get_option( self::preferred_option_key(), array() );
+		if ( ! is_array( $all ) ) {
+			return array();
+		}
+		$ids = array();
+		foreach ( $all as $key => $value ) {
+			if ( '' === sanitize_text_field( (string) $value ) ) {
+				continue;
+			}
+			$id = absint( $key );
+			if ( $id > 0 ) {
+				$ids[] = $id;
+			}
+		}
+		return array_values( array_unique( $ids ) );
+	}
+
+	/**
+	 * Human-readable pending preferred time, or empty.
+	 *
+	 * @param int $job_id Job ID.
+	 * @return string
+	 */
+	public static function format_preferred_label( $job_id ) {
+		$preferred = self::get_preferred_at( $job_id );
+		if ( '' === $preferred ) {
+			return '';
+		}
+		$pref_ts = strtotime( str_replace( 'T', ' ', $preferred ) );
+		if ( false === $pref_ts ) {
+			return $preferred;
+		}
+		return wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $pref_ts );
 	}
 }

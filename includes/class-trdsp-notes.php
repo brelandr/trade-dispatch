@@ -46,6 +46,42 @@ class TRDSP_Notes {
 	}
 
 	/**
+	 * Latest note for each job ID.
+	 *
+	 * @param array<int,int> $job_ids Job IDs.
+	 * @return array<int,array<string,mixed>> Map of job_id => note row.
+	 */
+	public static function latest_by_job_ids( $job_ids ) {
+		global $wpdb;
+		$ids = array();
+		foreach ( (array) $job_ids as $id ) {
+			$id = absint( $id );
+			if ( $id > 0 ) {
+				$ids[ $id ] = $id;
+			}
+		}
+		if ( empty( $ids ) ) {
+			return array();
+		}
+		$table        = self::table();
+		$ids          = array_values( $ids );
+		$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table list.
+		$sql  = "SELECT n.* FROM {$table} n INNER JOIN ( SELECT job_id, MAX(id) AS max_id FROM {$table} WHERE job_id IN ({$placeholders}) GROUP BY job_id ) t ON n.id = t.max_id"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table from prefix + fixed slug; placeholders are %d only.
+		$rows = $wpdb->get_results(
+			$wpdb->prepare( $sql, ...$ids ),
+			ARRAY_A
+		);
+		$map = array();
+		if ( is_array( $rows ) ) {
+			foreach ( $rows as $row ) {
+				$map[ (int) $row['job_id'] ] = $row;
+			}
+		}
+		return $map;
+	}
+
+	/**
 	 * Add a note.
 	 *
 	 * @param int    $job_id Job ID.

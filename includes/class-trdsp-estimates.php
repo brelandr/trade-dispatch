@@ -173,6 +173,27 @@ class TRDSP_Estimates {
 	}
 
 	/**
+	 * Accepted estimates that are not linked to a job yet.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	public static function awaiting_job() {
+		$rows = self::query(
+			array(
+				'status' => 'accepted',
+				'limit'  => 100,
+			)
+		);
+		$out = array();
+		foreach ( $rows as $row ) {
+			if ( (int) $row['job_id'] < 1 ) {
+				$out[] = $row;
+			}
+		}
+		return $out;
+	}
+
+	/**
 	 * Delete an estimate.
 	 *
 	 * @param int $id Estimate ID.

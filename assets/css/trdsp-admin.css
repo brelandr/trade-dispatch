@@ -23,6 +23,13 @@
 	vertical-align: middle;
 }
 
+.trdsp-wrap .trdsp-latest-note {
+	max-width: 220px;
+	color: #50575e;
+	font-size: 12px;
+	line-height: 1.4;
+}
+
 .trdsp-wrap .trdsp-actions a {
 	margin-right: 8px;
 }
@@ -91,4 +98,9 @@
 	padding: 0.75em 1em;
 	background: #fff;
 	border: 1px solid #c3c4c7;
+}
+
+.trdsp-wrap .trdsp-day-check {
+	display: inline-block;
+	margin: 0 12px 6px 0;
 }

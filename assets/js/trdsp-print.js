@@ -1,9 +1,11 @@
 ( function () {
-	var button = document.getElementById( 'trdsp-print-work-order' );
-	if ( ! button ) {
+	var buttons = document.querySelectorAll( '[id^="trdsp-print-"]' );
+	if ( ! buttons.length ) {
 		return;
 	}
-	button.addEventListener( 'click', function () {
-		window.print();
+	Array.prototype.forEach.call( buttons, function ( button ) {
+		button.addEventListener( 'click', function () {
+			window.print();
+		} );
 	} );
 }() );

@@ -33,4 +33,18 @@ foreach ( $trdsp_tables as $trdsp_table ) {
 
 delete_option( 'trdsp_settings' );
 delete_option( 'trdsp_db_version' );
+delete_option( 'trdsp_preferred_times' );
+delete_option( 'trdsp_estimate_requests' );
+delete_option( 'trdsp_email_templates' );
+delete_option( 'trdsp_roles_version' );
 wp_clear_scheduled_hook( 'trdsp_cron_recurring_jobs' );
+
+$trdsp_admin = get_role( 'administrator' );
+if ( $trdsp_admin ) {
+	foreach ( array( 'trdsp_portal', 'trdsp_access', 'trdsp_edit_own_jobs', 'trdsp_manage_jobs', 'trdsp_manage_customers', 'trdsp_manage_estimates', 'trdsp_manage_settings' ) as $trdsp_cap ) {
+		$trdsp_admin->remove_cap( $trdsp_cap );
+	}
+}
+remove_role( 'trdsp_customer' );
+remove_role( 'trdsp_employee' );
+remove_role( 'trdsp_dispatcher' );

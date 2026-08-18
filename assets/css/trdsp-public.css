@@ -95,3 +95,53 @@
 .trdsp-visit p {
 	margin: 0.5rem 0 0;
 }
+
+.trdsp-portal-photos {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 0.75rem 0 0;
+}
+
+.trdsp-portal-photos figure {
+	margin: 0;
+	width: 140px;
+}
+
+.trdsp-portal-photos img {
+	display: block;
+	width: 140px;
+	height: auto;
+}
+
+.trdsp-portal-photos figcaption {
+	font-size: 0.85em;
+	margin-top: 4px;
+}
+
+.trdsp-hint {
+	margin: -0.5rem 0 1rem;
+	font-size: 0.9em;
+	opacity: 0.85;
+}
+
+.trdsp-busy {
+	margin: -0.25rem 0 1rem;
+	padding-left: 1.25rem;
+	font-size: 0.9em;
+}
+
+.trdsp-slots {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin: 0 0 1rem;
+}
+
+.trdsp-slot {
+	border: 1px solid #c3c4c7;
+	background: #fff;
+	border-radius: 999px;
+	padding: 0.4rem 0.75rem;
+	cursor: pointer;
+}

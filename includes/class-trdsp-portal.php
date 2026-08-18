@@ -26,6 +26,40 @@ class TRDSP_Portal {
 	}
 
 	/**
+	 * Saved portal page ID (0 = not set).
+	 *
+	 * @return int
+	 */
+	public static function page_id() {
+		$settings = get_option( 'trdsp_settings', array() );
+		return isset( $settings['portal_page_id'] ) ? absint( $settings['portal_page_id'] ) : 0;
+	}
+
+	/**
+	 * Portal permalink, or the home URL when no page is saved.
+	 *
+	 * @return string
+	 */
+	public static function url() {
+		$set = self::url_if_set();
+		return '' !== $set ? $set : home_url( '/' );
+	}
+
+	/**
+	 * Portal permalink only when a published page is selected.
+	 *
+	 * @return string
+	 */
+	public static function url_if_set() {
+		$id = self::page_id();
+		if ( $id < 1 ) {
+			return '';
+		}
+		$url = get_permalink( $id );
+		return is_string( $url ) && '' !== $url ? $url : '';
+	}
+
+	/**
 	 * Shortcode output.
 	 *
 	 * @param array<string,string>|string $atts Attributes.
@@ -34,6 +68,7 @@ class TRDSP_Portal {
 	public static function render( $atts ) {
 		unset( $atts );
 		wp_enqueue_style( 'trdsp-public' );
+		wp_enqueue_script( 'trdsp-booking' );
 		if ( ! is_user_logged_in() ) {
 			$login = wp_login_url( get_permalink() ? (string) get_permalink() : home_url( '/' ) );
 			return '<div class="trdsp-portal"><p>' . esc_html__( 'Log in to view your scheduled visits and service history.', 'trade-dispatch' ) . '</p><p><a class="trdsp-submit" href="' . esc_url( $login ) . '">' . esc_html__( 'Log in', 'trade-dispatch' ) . '</a></p></div>';
@@ -181,13 +216,11 @@ class TRDSP_Portal {
 			echo '<tr>';
 			echo '<td>' . esc_html( $when ) . '</td>';
 			echo '<td>' . esc_html( (string) $job['title'] ) . '</td>';
-			echo '<td>' . esc_html( $status ) . '</td>';
+			echo '<td>' . esc_html( $status );
+			do_action( 'trdsp_portal_after_visit_status', $job );
+			echo '</td>';
 			echo '<td>';
-			if ( $open ) {
-				self::render_visit_details( $job, $addr );
-			} else {
-				echo esc_html( $addr );
-			}
+			self::render_visit_details( $job, $addr );
 			echo '</td>';
 			if ( $open ) {
 				echo '<td>';
@@ -214,6 +247,10 @@ class TRDSP_Portal {
 		if ( ! empty( $job['hazard_notes'] ) ) {
 			echo '<p>' . esc_html__( 'Hazards', 'trade-dispatch' ) . ': ' . esc_html( (string) $job['hazard_notes'] ) . '</p>';
 		}
+		$pref_label = TRDSP_Jobs::format_preferred_label( (int) $job['id'] );
+		if ( '' !== $pref_label ) {
+			echo '<p>' . esc_html__( 'Requested time (waiting on the office)', 'trade-dispatch' ) . ': ' . esc_html( $pref_label ) . '</p>';
+		}
 		if ( ! empty( $job['scheduled_at'] ) ) {
 			$ics = wp_nonce_url(
 				add_query_arg(
@@ -227,6 +264,8 @@ class TRDSP_Portal {
 			);
 			echo '<p><a href="' . esc_url( $ics ) . '">' . esc_html__( 'Add to calendar', 'trade-dispatch' ) . '</a></p>';
 		}
+		do_action( 'trdsp_portal_after_visit_details', $job );
+		do_action( 'trdsp_portal_after_visit_media', $job );
 		echo '</details>';
 	}
 
@@ -258,6 +297,8 @@ class TRDSP_Portal {
 		echo '<input type="hidden" name="estimate_id" value="' . esc_attr( (string) (int) $estimate['id'] ) . '" />';
 		echo '<input type="hidden" name="trdsp_redirect" value="' . esc_url( $redirect ) . '" />';
 		wp_nonce_field( 'trdsp_portal_estimate_request_' . (int) $estimate['id'], 'trdsp_portal_estimate_request_nonce' );
+		echo '<p><label for="trdsp_emsg_' . esc_attr( (string) (int) $estimate['id'] ) . '">' . esc_html__( 'Note for the office', 'trade-dispatch' ) . '</label> ';
+		echo '<textarea id="trdsp_emsg_' . esc_attr( (string) (int) $estimate['id'] ) . '" name="trdsp_message" rows="3"></textarea></p>';
 		echo '<button type="submit" class="trdsp-submit">' . esc_html__( 'I\'d like to schedule this', 'trade-dispatch' ) . '</button>';
 		echo '</form>';
 	}
@@ -276,8 +317,12 @@ class TRDSP_Portal {
 		echo '<input type="hidden" name="job_id" value="' . esc_attr( (string) (int) $job['id'] ) . '" />';
 		echo '<input type="hidden" name="trdsp_redirect" value="' . esc_url( $redirect ) . '" />';
 		wp_nonce_field( 'trdsp_portal_reschedule_' . (int) $job['id'], 'trdsp_portal_reschedule_nonce' );
-		echo '<p><label for="trdsp_pref_' . esc_attr( (string) (int) $job['id'] ) . '">' . esc_html__( 'Preferred date and time', 'trade-dispatch' ) . '</label> ';
-		echo '<input id="trdsp_pref_' . esc_attr( (string) (int) $job['id'] ) . '" name="trdsp_preferred_at" type="datetime-local" /></p>';
+		$pref_id = 'trdsp_pref_' . (int) $job['id'];
+		echo '<p><label for="' . esc_attr( $pref_id ) . '">' . esc_html__( 'Preferred date and time', 'trade-dispatch' ) . '</label> ';
+		echo '<input id="' . esc_attr( $pref_id ) . '" name="trdsp_preferred_at" type="datetime-local" /></p>';
+		if ( class_exists( 'TRDSP_Booking' ) ) {
+			TRDSP_Booking::render_suggested_chips( $pref_id );
+		}
 		echo '<p><label for="trdsp_rmsg_' . esc_attr( (string) (int) $job['id'] ) . '">' . esc_html__( 'Note for the office', 'trade-dispatch' ) . '</label> ';
 		echo '<textarea id="trdsp_rmsg_' . esc_attr( (string) (int) $job['id'] ) . '" name="trdsp_message" rows="3"></textarea></p>';
 		echo '<p><button type="submit" class="trdsp-submit">' . esc_html__( 'Send request', 'trade-dispatch' ) . '</button></p>';
@@ -329,6 +374,9 @@ class TRDSP_Portal {
 			wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_portal', 'error', $safe ) ) );
 			exit;
 		}
+		if ( '' !== $preferred ) {
+			TRDSP_Jobs::set_preferred_at( $id, $preferred );
+		}
 		/**
 		 * After a portal customer requests a reschedule.
 		 *
@@ -361,6 +409,10 @@ class TRDSP_Portal {
 		if ( ! $estimate || ! $customer || (int) $estimate['customer_id'] !== (int) $customer['id'] || 'sent' !== (string) $estimate['status'] ) {
 			wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_portal', 'error', $safe ) ) );
 			exit;
+		}
+		$message = isset( $_POST['trdsp_message'] ) ? sanitize_textarea_field( wp_unslash( $_POST['trdsp_message'] ) ) : '';
+		if ( class_exists( 'TRDSP_Requests' ) ) {
+			TRDSP_Requests::set_estimate_request( $id, $message );
 		}
 		/**
 		 * After a portal customer asks to schedule a sent estimate.
@@ -408,6 +460,9 @@ class TRDSP_Portal {
 			exit;
 		}
 		$fresh = TRDSP_Estimates::get( $id );
+		if ( class_exists( 'TRDSP_Requests' ) ) {
+			TRDSP_Requests::clear_estimate_request( $id );
+		}
 		/**
 		 * After a portal customer accepts an estimate (not a charge).
 		 *

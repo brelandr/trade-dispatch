@@ -32,11 +32,30 @@ class TRDSP_Booking {
 	public static function render( $atts ) {
 		unset( $atts );
 		wp_enqueue_style( 'trdsp-public' );
-		$notice = '';
+		wp_enqueue_script( 'trdsp-booking' );
+		$window = self::window_config();
+		wp_localize_script(
+			'trdsp-booking',
+			'trdspBooking',
+			array(
+				'minutesLabel' => __( 'Typical visit: about %d minutes', 'trade-dispatch' ),
+				'outsideHours' => __( 'That time is outside posted hours. You can still send the request — the office will confirm.', 'trade-dispatch' ),
+				'busyDay'      => __( 'Another visit is already on the calendar near that time. You can still send the request.', 'trade-dispatch' ),
+				'open'         => $window['open'],
+				'close'        => $window['close'],
+				'days'         => $window['days'],
+				'occupied'     => $window['occupied'],
+			)
+		);
+		$settings = get_option( 'trdsp_settings', array() );
+		$hours    = isset( $settings['booking_hours_hint'] ) ? sanitize_textarea_field( (string) $settings['booking_hours_hint'] ) : '';
+		$notice   = '';
 		if ( isset( $_GET['trdsp_booked'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Public thank-you flag only.
 			$flag = sanitize_key( wp_unslash( $_GET['trdsp_booked'] ) );
 			if ( '1' === $flag ) {
 				$notice = '<p class="trdsp-notice trdsp-notice-ok">' . esc_html__( 'Thanks — your booking request was sent. If this is your first visit, check your email for a login to the customer portal.', 'trade-dispatch' ) . '</p>';
+			} elseif ( 'window' === $flag ) {
+				$notice = '<p class="trdsp-notice trdsp-notice-ok">' . esc_html__( 'Thanks — your request was sent. That time is outside posted hours or already busy; the office will confirm a visit time.', 'trade-dispatch' ) . '</p>';
 			} elseif ( 'error' === $flag ) {
 				$notice = '<p class="trdsp-notice trdsp-notice-err">' . esc_html__( 'Please fill in your name, email, and a service description.', 'trade-dispatch' ) . '</p>';
 			}
@@ -61,14 +80,27 @@ class TRDSP_Booking {
 			echo '<select id="trdsp_book_service" name="trdsp_service_id">';
 			echo '<option value="0">' . esc_html__( 'Other / describe below', 'trade-dispatch' ) . '</option>';
 			foreach ( $services as $service ) {
-				echo '<option value="' . esc_attr( (string) $service['id'] ) . '">' . esc_html( (string) $service['name'] ) . '</option>';
+				echo '<option value="' . esc_attr( (string) $service['id'] ) . '" data-minutes="' . esc_attr( (string) $service['default_minutes'] ) . '">' . esc_html( (string) $service['name'] ) . '</option>';
 			}
 			echo '</select></p>';
+			echo '<p id="trdsp_book_minutes_hint" class="trdsp-hint"></p>';
 		}
 		echo '<p><label for="trdsp_book_title">' . esc_html__( 'Service needed', 'trade-dispatch' ) . '</label> ';
 		echo '<input id="trdsp_book_title" name="trdsp_title" type="text" /></p>';
 		echo '<p><label for="trdsp_book_when">' . esc_html__( 'Preferred date and time', 'trade-dispatch' ) . '</label> ';
 		echo '<input id="trdsp_book_when" name="trdsp_scheduled_at" type="datetime-local" /></p>';
+		self::render_suggested_chips( 'trdsp_book_when', 'trdsp_book_slots' );
+		if ( '' !== $hours ) {
+			echo '<p class="trdsp-hint">' . esc_html( $hours ) . '</p>';
+		}
+		echo '<p id="trdsp_book_window_hint" class="trdsp-hint" hidden></p>';
+		if ( ! empty( $window['occupied'] ) ) {
+			echo '<p class="trdsp-hint">' . esc_html__( 'Times already on the calendar (no customer details):', 'trade-dispatch' ) . '</p><ul class="trdsp-busy">';
+			foreach ( $window['occupied'] as $slot ) {
+				echo '<li>' . esc_html( $slot['date'] . ' ' . $slot['time'] ) . '</li>';
+			}
+			echo '</ul>';
+		}
 		echo '<p><label for="trdsp_book_address">' . esc_html__( 'Address', 'trade-dispatch' ) . '</label> ';
 		echo '<input id="trdsp_book_address" name="trdsp_address_1" type="text" /></p>';
 		echo '<p><label for="trdsp_book_city">' . esc_html__( 'City', 'trade-dispatch' ) . '</label> ';
@@ -136,6 +168,7 @@ class TRDSP_Booking {
 		$job_id = TRDSP_Jobs::save(
 			array(
 				'customer_id'  => (int) $cust_id,
+				'service_id'   => $service ? (int) $service['id'] : 0,
 				'title'        => $title,
 				'status'       => 'requested',
 				'scheduled_at' => isset( $_POST['trdsp_scheduled_at'] ) ? sanitize_text_field( wp_unslash( $_POST['trdsp_scheduled_at'] ) ) : '',
@@ -163,12 +196,174 @@ class TRDSP_Booking {
 			do_action( 'trdsp_job_booked', (int) $job_id, $job );
 		}
 
-		wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_booked', '1', $redirect ) ) );
+		$flag = '1';
+		$when = isset( $_POST['trdsp_scheduled_at'] ) ? sanitize_text_field( wp_unslash( $_POST['trdsp_scheduled_at'] ) ) : '';
+		if ( '' !== $when && self::is_outside_window( $when ) ) {
+			$flag = 'window';
+		}
+		wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_booked', $flag, $redirect ) ) );
 		exit;
 	}
 
 	/**
-	 * Create a subscriber so the customer can open the portal.
+	 * Booking window + occupied times for the public form.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public static function window_config() {
+		$settings = get_option( 'trdsp_settings', array() );
+		$days     = isset( $settings['booking_days'] ) && is_array( $settings['booking_days'] ) ? array_map( 'absint', $settings['booking_days'] ) : array();
+		$occupied = array();
+		if ( class_exists( 'TRDSP_Jobs' ) ) {
+			$occupied = TRDSP_Jobs::public_busy_times( gmdate( 'Y-m-d H:i:s' ), gmdate( 'Y-m-d H:i:s', time() + ( 14 * DAY_IN_SECONDS ) ) );
+		}
+		return array(
+			'open'     => isset( $settings['booking_open'] ) ? (string) $settings['booking_open'] : '',
+			'close'    => isset( $settings['booking_close'] ) ? (string) $settings['booking_close'] : '',
+			'days'     => array_values( array_unique( $days ) ),
+			'occupied' => $occupied,
+		);
+	}
+
+	/**
+	 * Whether a preferred datetime is outside posted hours or already busy.
+	 *
+	 * @param string $value Raw datetime.
+	 * @return bool
+	 */
+	public static function is_outside_window( $value ) {
+		$cfg = self::window_config();
+		$ts  = strtotime( str_replace( 'T', ' ', (string) $value ) );
+		if ( false === $ts ) {
+			return false;
+		}
+		$day  = (int) wp_date( 'w', $ts );
+		$hm   = wp_date( 'H:i', $ts );
+		$date = wp_date( 'Y-m-d', $ts );
+		if ( ! empty( $cfg['days'] ) && ! in_array( $day, $cfg['days'], true ) ) {
+			return true;
+		}
+		if ( '' !== $cfg['open'] && $hm < $cfg['open'] ) {
+			return true;
+		}
+		if ( '' !== $cfg['close'] && $hm > $cfg['close'] ) {
+			return true;
+		}
+		foreach ( $cfg['occupied'] as $slot ) {
+			if ( $slot['date'] === $date && $slot['time'] === $hm ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Suggested public times (not a reserved-slot engine).
+	 *
+	 * @param int $step Minutes between suggestions.
+	 * @return array<int,array<string,string>>
+	 */
+	public static function suggested_slots( $step = 60 ) {
+		$step = max( 30, min( 120, absint( $step ) ) );
+		$cfg  = self::window_config();
+		$open = '' !== $cfg['open'] ? $cfg['open'] : '08:00';
+		$close = '' !== $cfg['close'] ? $cfg['close'] : '17:00';
+		$busy  = array();
+		foreach ( $cfg['occupied'] as $slot ) {
+			$busy[ $slot['date'] . 'T' . $slot['time'] ] = true;
+		}
+		$tz  = function_exists( 'wp_timezone' ) ? wp_timezone() : new DateTimeZone( 'UTC' );
+		$now = new DateTimeImmutable( 'now', $tz );
+		$out = array();
+		for ( $d = 0; $d < 7 && count( $out ) < 18; $d++ ) {
+			$day = $now->modify( '+' . $d . ' days' );
+			$w   = (int) $day->format( 'w' );
+			if ( ! empty( $cfg['days'] ) && ! in_array( $w, $cfg['days'], true ) ) {
+				continue;
+			}
+			$start = DateTimeImmutable::createFromFormat( 'Y-m-d H:i', $day->format( 'Y-m-d' ) . ' ' . $open, $tz );
+			$end   = DateTimeImmutable::createFromFormat( 'Y-m-d H:i', $day->format( 'Y-m-d' ) . ' ' . $close, $tz );
+			if ( ! $start || ! $end ) {
+				continue;
+			}
+			for ( $t = $start; $t <= $end && count( $out ) < 18; $t = $t->modify( '+' . $step . ' minutes' ) ) {
+				if ( $t <= $now ) {
+					continue;
+				}
+				$key = $t->format( 'Y-m-d' ) . 'T' . $t->format( 'H:i' );
+				if ( isset( $busy[ $key ] ) ) {
+					continue;
+				}
+				$out[] = array(
+					'value' => $key,
+					'label' => wp_date( 'D g:i a', $t->getTimestamp() ),
+				);
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Suggested days (fills the datetime with the open hour, or 9am).
+	 *
+	 * @param int $count Max days.
+	 * @return array<int,array<string,string>>
+	 */
+	public static function suggested_days( $count = 7 ) {
+		$count = max( 1, min( 14, absint( $count ) ) );
+		$cfg   = self::window_config();
+		$open  = '' !== $cfg['open'] ? $cfg['open'] : '09:00';
+		$tz    = function_exists( 'wp_timezone' ) ? wp_timezone() : new DateTimeZone( 'UTC' );
+		$now   = new DateTimeImmutable( 'now', $tz );
+		$out   = array();
+		for ( $d = 0; $d < 21 && count( $out ) < $count; $d++ ) {
+			$day = $now->modify( '+' . $d . ' days' );
+			$w   = (int) $day->format( 'w' );
+			if ( ! empty( $cfg['days'] ) && ! in_array( $w, $cfg['days'], true ) ) {
+				continue;
+			}
+			$out[] = array(
+				'value' => $day->format( 'Y-m-d' ) . 'T' . $open,
+				'label' => wp_date( 'D, M j', $day->getTimestamp() ),
+			);
+		}
+		return $out;
+	}
+
+	/**
+	 * Time and day chips for a datetime-local input.
+	 *
+	 * @param string $input_id Input id.
+	 * @param string $slots_id Optional wrap id for time chips.
+	 */
+	public static function render_suggested_chips( $input_id, $slots_id = '' ) {
+		$input_id = sanitize_html_class( (string) $input_id );
+		$slots    = self::suggested_slots();
+		$days     = self::suggested_days();
+		if ( ! empty( $slots ) ) {
+			echo '<p class="trdsp-hint">' . esc_html__( 'Suggested times (you can still pick another). The office confirms the visit.', 'trade-dispatch' ) . '</p>';
+			echo '<div';
+			if ( '' !== $slots_id ) {
+				echo ' id="' . esc_attr( sanitize_html_class( $slots_id ) ) . '"';
+			}
+			echo ' class="trdsp-slots" data-for="' . esc_attr( $input_id ) . '">';
+			foreach ( $slots as $slot ) {
+				echo '<button type="button" class="trdsp-slot" data-value="' . esc_attr( (string) $slot['value'] ) . '">' . esc_html( (string) $slot['label'] ) . '</button>';
+			}
+			echo '</div>';
+		}
+		if ( ! empty( $days ) ) {
+			echo '<p class="trdsp-hint">' . esc_html__( 'Or pick a day (the office will confirm a time).', 'trade-dispatch' ) . '</p>';
+			echo '<div class="trdsp-slots trdsp-slots-days" data-for="' . esc_attr( $input_id ) . '">';
+			foreach ( $days as $day ) {
+				echo '<button type="button" class="trdsp-slot" data-value="' . esc_attr( (string) $day['value'] ) . '">' . esc_html( (string) $day['label'] ) . '</button>';
+			}
+			echo '</div>';
+		}
+	}
+
+	/**
+	 * Create a Customer-role account so they can open the portal.
 	 *
 	 * @param string $name  Display name.
 	 * @param string $email Email address.
@@ -197,7 +392,7 @@ class TRDSP_Booking {
 				'user_email'   => $email,
 				'user_pass'    => wp_generate_password( 24, true ),
 				'display_name' => $name,
-				'role'         => 'subscriber',
+				'role'         => 'trdsp_customer',
 			)
 		);
 		if ( ! is_wp_error( $user_id ) ) {
