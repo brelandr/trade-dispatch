@@ -55,8 +55,18 @@ class TRDSP_Booking {
 		echo '<input id="trdsp_book_email" name="trdsp_email" type="email" required /></p>';
 		echo '<p><label for="trdsp_book_phone">' . esc_html__( 'Phone', 'trade-dispatch' ) . '</label> ';
 		echo '<input id="trdsp_book_phone" name="trdsp_phone" type="text" /></p>';
+		$services = class_exists( 'TRDSP_Services' ) ? TRDSP_Services::query() : array();
+		if ( ! empty( $services ) ) {
+			echo '<p><label for="trdsp_book_service">' . esc_html__( 'Service', 'trade-dispatch' ) . '</label> ';
+			echo '<select id="trdsp_book_service" name="trdsp_service_id">';
+			echo '<option value="0">' . esc_html__( 'Other / describe below', 'trade-dispatch' ) . '</option>';
+			foreach ( $services as $service ) {
+				echo '<option value="' . esc_attr( (string) $service['id'] ) . '">' . esc_html( (string) $service['name'] ) . '</option>';
+			}
+			echo '</select></p>';
+		}
 		echo '<p><label for="trdsp_book_title">' . esc_html__( 'Service needed', 'trade-dispatch' ) . '</label> ';
-		echo '<input id="trdsp_book_title" name="trdsp_title" type="text" required /></p>';
+		echo '<input id="trdsp_book_title" name="trdsp_title" type="text" /></p>';
 		echo '<p><label for="trdsp_book_when">' . esc_html__( 'Preferred date and time', 'trade-dispatch' ) . '</label> ';
 		echo '<input id="trdsp_book_when" name="trdsp_scheduled_at" type="datetime-local" /></p>';
 		echo '<p><label for="trdsp_book_address">' . esc_html__( 'Address', 'trade-dispatch' ) . '</label> ';
@@ -92,7 +102,12 @@ class TRDSP_Booking {
 
 		$name  = isset( $_POST['trdsp_name'] ) ? sanitize_text_field( wp_unslash( $_POST['trdsp_name'] ) ) : '';
 		$email = isset( $_POST['trdsp_email'] ) ? sanitize_email( wp_unslash( $_POST['trdsp_email'] ) ) : '';
-		$title = isset( $_POST['trdsp_title'] ) ? sanitize_text_field( wp_unslash( $_POST['trdsp_title'] ) ) : '';
+		$title       = isset( $_POST['trdsp_title'] ) ? sanitize_text_field( wp_unslash( $_POST['trdsp_title'] ) ) : '';
+		$service_id  = isset( $_POST['trdsp_service_id'] ) ? absint( wp_unslash( $_POST['trdsp_service_id'] ) ) : 0;
+		$service     = $service_id > 0 && class_exists( 'TRDSP_Services' ) ? TRDSP_Services::get( $service_id ) : null;
+		if ( $service && '' === $title ) {
+			$title = (string) $service['name'];
+		}
 		if ( '' === $name || '' === $email || ! is_email( $email ) || '' === $title ) {
 			wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_booked', 'error', $redirect ) ) );
 			exit;

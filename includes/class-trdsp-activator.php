@@ -46,6 +46,7 @@ class TRDSP_Activator {
 		$jobs            = $wpdb->prefix . 'trdsp_jobs';
 		$estimates       = $wpdb->prefix . 'trdsp_estimates';
 		$notes           = $wpdb->prefix . 'trdsp_job_notes';
+		$services        = $wpdb->prefix . 'trdsp_services';
 
 		$sql = "CREATE TABLE {$customers} (
 			id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -108,6 +109,17 @@ class TRDSP_Activator {
 			created_at datetime NOT NULL,
 			PRIMARY KEY  (id),
 			KEY job_id (job_id)
+		) {$charset_collate};
+
+		CREATE TABLE {$services} (
+			id bigint(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+			name varchar(191) NOT NULL DEFAULT '',
+			description text NOT NULL,
+			default_minutes int(11) UNSIGNED NOT NULL DEFAULT 60,
+			default_amount decimal(12,2) NOT NULL DEFAULT 0.00,
+			created_at datetime NOT NULL,
+			updated_at datetime NOT NULL,
+			PRIMARY KEY  (id)
 		) {$charset_collate};";
 
 		if ( ! function_exists( 'dbDelta' ) ) {

@@ -31,10 +31,11 @@ class TRDSP_Estimates {
 	 */
 	public static function statuses() {
 		return array(
-			'draft' => __( 'Draft', 'trade-dispatch' ),
-			'sent'  => __( 'Sent', 'trade-dispatch' ),
-			'paid'  => __( 'Paid', 'trade-dispatch' ),
-			'void'  => __( 'Void', 'trade-dispatch' ),
+			'draft'    => __( 'Draft', 'trade-dispatch' ),
+			'sent'     => __( 'Sent', 'trade-dispatch' ),
+			'accepted' => __( 'Accepted', 'trade-dispatch' ),
+			'paid'     => __( 'Paid', 'trade-dispatch' ),
+			'void'     => __( 'Void', 'trade-dispatch' ),
 		);
 	}
 

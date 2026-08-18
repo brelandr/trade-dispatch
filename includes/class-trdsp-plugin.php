@@ -52,6 +52,7 @@ class TRDSP_Plugin {
 		TRDSP_Mail::hooks();
 		TRDSP_Privacy::hooks();
 		TRDSP_Booking::hooks();
+		TRDSP_Services::hooks();
 		TRDSP_Portal::hooks();
 		TRDSP_Blocks::hooks();
 		TRDSP_REST::hooks();

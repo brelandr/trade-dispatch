@@ -23,6 +23,7 @@ $trdsp_tables = array(
 	$wpdb->prefix . 'trdsp_jobs',
 	$wpdb->prefix . 'trdsp_estimates',
 	$wpdb->prefix . 'trdsp_job_notes',
+	$wpdb->prefix . 'trdsp_services',
 );
 
 foreach ( $trdsp_tables as $trdsp_table ) {

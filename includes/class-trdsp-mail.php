@@ -24,6 +24,7 @@ class TRDSP_Mail {
 		add_action( 'trdsp_estimate_sent', array( __CLASS__, 'on_estimate_sent' ), 10, 2 );
 		add_action( 'trdsp_portal_reschedule_requested', array( __CLASS__, 'on_reschedule_requested' ), 10, 4 );
 		add_action( 'trdsp_portal_estimate_requested', array( __CLASS__, 'on_estimate_requested' ), 10, 2 );
+		add_action( 'trdsp_estimate_accepted', array( __CLASS__, 'on_estimate_accepted' ), 10, 2 );
 	}
 
 	/**
@@ -219,6 +220,34 @@ class TRDSP_Mail {
 		$lines[] = __( 'Open in admin', 'trade-dispatch' ) . ': ' . $edit;
 		$lines[] = '';
 		$lines[] = self::company_name();
+		self::send_to_office( $subject, implode( "\n", $lines ) );
+	}
+
+	/**
+	 * Office: customer accepted an estimate (not a payment).
+	 *
+	 * @param int                  $estimate_id Estimate ID.
+	 * @param array<string,mixed> $estimate    Estimate row.
+	 */
+	public static function on_estimate_accepted( $estimate_id, $estimate ) {
+		$customer = TRDSP_Customers::get( absint( $estimate['customer_id'] ?? 0 ) );
+		$subject  = sprintf(
+			/* translators: %s estimate title */
+			__( 'Estimate accepted: %s', 'trade-dispatch' ),
+			(string) ( $estimate['title'] ?? '' )
+		);
+		$lines = array(
+			__( 'A customer accepted this estimate from the portal. This is not a payment.', 'trade-dispatch' ),
+			'',
+			__( 'Estimate', 'trade-dispatch' ) . ': ' . (string) ( $estimate['title'] ?? '' ),
+			__( 'Amount', 'trade-dispatch' ) . ': ' . number_format_i18n( (float) ( $estimate['amount'] ?? 0 ), 2 ),
+		);
+		if ( $customer ) {
+			$lines[] = __( 'Customer', 'trade-dispatch' ) . ': ' . (string) $customer['name'];
+		}
+		$lines[] = '';
+		$lines[] = self::company_name();
+		unset( $estimate_id );
 		self::send_to_office( $subject, implode( "\n", $lines ) );
 	}
 

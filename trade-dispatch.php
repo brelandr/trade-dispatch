@@ -6,7 +6,7 @@
  *
  * Plugin Name: Trade Dispatch
  * Description: Field service management for small trades: customers, jobs, scheduling, and a client portal on your own WordPress site.
- * Version: 0.3.8
+ * Version: 0.3.9
  * Author: Land Tech Web Designs, Corp
  * Author URI: https://landtechwebdesigns.com
  * Plugin URI: https://tradedispatch.app
@@ -23,10 +23,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! defined( 'TRDSP_VERSION' ) ) {
-	define( 'TRDSP_VERSION', '0.3.8' );
+	define( 'TRDSP_VERSION', '0.3.9' );
 }
 if ( ! defined( 'TRDSP_DB_VERSION' ) ) {
-	define( 'TRDSP_DB_VERSION', '1' );
+	define( 'TRDSP_DB_VERSION', '2' );
 }
 if ( ! defined( 'TRDSP_PLUGIN_FILE' ) ) {
 	define( 'TRDSP_PLUGIN_FILE', __FILE__ );
@@ -42,6 +42,7 @@ require_once TRDSP_PLUGIN_DIR . 'includes/class-trdsp-activator.php';
 require_once TRDSP_PLUGIN_DIR . 'includes/class-trdsp-customers.php';
 require_once TRDSP_PLUGIN_DIR . 'includes/class-trdsp-jobs.php';
 require_once TRDSP_PLUGIN_DIR . 'includes/class-trdsp-estimates.php';
+require_once TRDSP_PLUGIN_DIR . 'includes/class-trdsp-services.php';
 require_once TRDSP_PLUGIN_DIR . 'includes/class-trdsp-notes.php';
 require_once TRDSP_PLUGIN_DIR . 'includes/class-trdsp-mail.php';
 require_once TRDSP_PLUGIN_DIR . 'includes/class-trdsp-privacy.php';

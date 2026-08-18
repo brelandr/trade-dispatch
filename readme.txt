@@ -4,7 +4,7 @@ Tags: booking, scheduling, jobs, dispatch, field-service
 Requires at least: 6.2
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 0.3.8
+Stable tag: 0.3.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -40,6 +40,10 @@ No. Assign jobs to any WordPress user.
 No.
 
 == Changelog ==
+
+= 0.3.9 =
+* Add: Services list (Trade Dispatch → Services) and optional service dropdown on the booking form. Still no charges.
+* Add: Customers can Accept a sent estimate from the portal (status accepted — not a payment).
 
 = 0.3.8 =
 * Add: Portal hook after estimates so add-ons can show invoices without changing free quote records.

@@ -1264,6 +1264,14 @@ class TRDSP_Admin {
 			);
 			echo '<p><a class="button" href="' . esc_url( $convert ) . '">' . esc_html__( 'Create job from this estimate', 'trade-dispatch' ) . '</a></p>';
 		}
+		if ( $id > 0 ) {
+			/**
+			 * After the estimate edit form (AI draft, etc.).
+			 *
+			 * @param int $id Estimate ID.
+			 */
+			do_action( 'trdsp_estimate_edit_after_form', $id );
+		}
 		echo '</div>';
 	}
 

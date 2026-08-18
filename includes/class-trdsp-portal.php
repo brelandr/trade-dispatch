@@ -21,6 +21,7 @@ class TRDSP_Portal {
 		add_shortcode( 'trdsp_portal', array( __CLASS__, 'render' ) );
 		add_action( 'admin_post_trdsp_portal_reschedule', array( __CLASS__, 'handle_reschedule' ) );
 		add_action( 'admin_post_trdsp_portal_estimate_request', array( __CLASS__, 'handle_estimate_request' ) );
+		add_action( 'admin_post_trdsp_portal_accept_estimate', array( __CLASS__, 'handle_accept_estimate' ) );
 		add_action( 'admin_post_trdsp_portal_ics', array( __CLASS__, 'handle_ics' ) );
 	}
 
@@ -110,7 +111,10 @@ class TRDSP_Portal {
 				echo '<td>' . esc_html( '' !== $linked ? $linked : '—' ) . '</td>';
 				echo '<td>';
 				if ( 'sent' === (string) $estimate['status'] ) {
+					self::render_estimate_accept_form( $estimate );
 					self::render_estimate_request_form( $estimate );
+				} elseif ( 'accepted' === (string) $estimate['status'] ) {
+					echo esc_html__( 'Accepted — the office will schedule.', 'trade-dispatch' );
 				} else {
 					echo '&mdash;';
 				}
@@ -143,6 +147,8 @@ class TRDSP_Portal {
 			echo '<p class="trdsp-notice trdsp-notice-ok">' . esc_html__( 'Your reschedule request was sent to the office. They will confirm a new time.', 'trade-dispatch' ) . '</p>';
 		} elseif ( 'estimate_requested' === $flag ) {
 			echo '<p class="trdsp-notice trdsp-notice-ok">' . esc_html__( 'The office received your request to schedule this estimate.', 'trade-dispatch' ) . '</p>';
+		} elseif ( 'estimate_accepted' === $flag ) {
+			echo '<p class="trdsp-notice trdsp-notice-ok">' . esc_html__( 'You accepted this estimate. It is not a payment — the office will follow up.', 'trade-dispatch' ) . '</p>';
 		} elseif ( 'error' === $flag ) {
 			echo '<p class="trdsp-notice trdsp-notice-err">' . esc_html__( 'Could not send that request. Try again or contact the office.', 'trade-dispatch' ) . '</p>';
 		}
@@ -222,6 +228,22 @@ class TRDSP_Portal {
 			echo '<p><a href="' . esc_url( $ics ) . '">' . esc_html__( 'Add to calendar', 'trade-dispatch' ) . '</a></p>';
 		}
 		echo '</details>';
+	}
+
+	/**
+	 * Accept a sent estimate (not a charge).
+	 *
+	 * @param array<string,mixed> $estimate Estimate row.
+	 */
+	protected static function render_estimate_accept_form( $estimate ) {
+		$redirect = get_permalink() ? (string) get_permalink() : home_url( '/' );
+		echo '<form class="trdsp-form" method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="margin-bottom:8px;">';
+		echo '<input type="hidden" name="action" value="trdsp_portal_accept_estimate" />';
+		echo '<input type="hidden" name="estimate_id" value="' . esc_attr( (string) (int) $estimate['id'] ) . '" />';
+		echo '<input type="hidden" name="trdsp_redirect" value="' . esc_url( $redirect ) . '" />';
+		wp_nonce_field( 'trdsp_portal_accept_estimate_' . (int) $estimate['id'], 'trdsp_portal_accept_estimate_nonce' );
+		echo '<button type="submit" class="trdsp-submit">' . esc_html__( 'Accept estimate', 'trade-dispatch' ) . '</button>';
+		echo '</form>';
 	}
 
 	/**
@@ -348,6 +370,52 @@ class TRDSP_Portal {
 		 */
 		do_action( 'trdsp_portal_estimate_requested', $id, $estimate );
 		wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_portal', 'estimate_requested', $safe ) ) );
+		exit;
+	}
+
+	/**
+	 * Customer accepted a sent estimate (not a payment).
+	 */
+	public static function handle_accept_estimate() {
+		$id = isset( $_POST['estimate_id'] ) ? absint( wp_unslash( $_POST['estimate_id'] ) ) : 0;
+		if ( ! isset( $_POST['trdsp_portal_accept_estimate_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['trdsp_portal_accept_estimate_nonce'] ) ), 'trdsp_portal_accept_estimate_' . $id ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
+		if ( ! is_user_logged_in() ) {
+			wp_die( esc_html__( 'Unauthorized.', 'trade-dispatch' ) );
+		}
+		$redirect = isset( $_POST['trdsp_redirect'] ) ? esc_url_raw( wp_unslash( $_POST['trdsp_redirect'] ) ) : home_url( '/' );
+		$safe     = wp_validate_redirect( $redirect, home_url( '/' ) );
+		$estimate = TRDSP_Estimates::get( $id );
+		$user     = wp_get_current_user();
+		$customer = TRDSP_Customers::get_by_email( (string) $user->user_email );
+		if ( ! $estimate || ! $customer || (int) $estimate['customer_id'] !== (int) $customer['id'] || 'sent' !== (string) $estimate['status'] ) {
+			wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_portal', 'error', $safe ) ) );
+			exit;
+		}
+		$saved = TRDSP_Estimates::save(
+			array(
+				'id'          => $id,
+				'customer_id' => (int) $estimate['customer_id'],
+				'job_id'      => (int) ( $estimate['job_id'] ?? 0 ),
+				'title'       => (string) $estimate['title'],
+				'amount'      => (float) $estimate['amount'],
+				'status'      => 'accepted',
+			)
+		);
+		if ( is_wp_error( $saved ) ) {
+			wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_portal', 'error', $safe ) ) );
+			exit;
+		}
+		$fresh = TRDSP_Estimates::get( $id );
+		/**
+		 * After a portal customer accepts an estimate (not a charge).
+		 *
+		 * @param int                  $id       Estimate ID.
+		 * @param array<string,mixed> $estimate Estimate row.
+		 */
+		do_action( 'trdsp_estimate_accepted', $id, $fresh ? $fresh : $estimate );
+		wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_portal', 'estimate_accepted', $safe ) ) );
 		exit;
 	}
 
