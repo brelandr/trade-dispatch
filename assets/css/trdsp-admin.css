@@ -1,0 +1,28 @@
+.trdsp-wrap .trdsp-empty {
+	margin: 1em 0;
+	padding: 1em;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+}
+
+.trdsp-wrap .trdsp-filters {
+	margin: 1em 0;
+	padding: 12px;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+}
+
+.trdsp-wrap .trdsp-filters select,
+.trdsp-wrap .trdsp-filters input[type="search"],
+.trdsp-wrap .trdsp-filters input[type="date"] {
+	margin-right: 8px;
+}
+
+.trdsp-wrap .widefat td,
+.trdsp-wrap .widefat th {
+	vertical-align: middle;
+}
+
+.trdsp-wrap .trdsp-actions a {
+	margin-right: 8px;
+}

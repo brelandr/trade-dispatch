@@ -1,0 +1,67 @@
+.trdsp-booking,
+.trdsp-portal {
+	max-width: 40rem;
+	margin: 1.5rem 0;
+}
+
+.trdsp-form p {
+	margin: 0 0 1rem;
+}
+
+.trdsp-form label {
+	display: block;
+	font-weight: 600;
+	margin-bottom: 0.25rem;
+}
+
+.trdsp-form input[type="text"],
+.trdsp-form input[type="email"],
+.trdsp-form input[type="datetime-local"],
+.trdsp-form textarea {
+	width: 100%;
+	max-width: 100%;
+}
+
+.trdsp-hp {
+	position: absolute;
+	left: -9999px;
+	height: 0;
+	overflow: hidden;
+}
+
+.trdsp-notice {
+	padding: 0.75rem 1rem;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+}
+
+.trdsp-notice-ok {
+	border-color: #00a32a;
+}
+
+.trdsp-notice-err {
+	border-color: #d63638;
+}
+
+.trdsp-submit {
+	display: inline-block;
+	padding: 0.5rem 1rem;
+	background: #1d2327;
+	color: #fff;
+	text-decoration: none;
+	border: 0;
+	cursor: pointer;
+}
+
+.trdsp-table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 1rem 0;
+}
+
+.trdsp-table th,
+.trdsp-table td {
+	border-bottom: 1px solid #dcdcde;
+	padding: 0.5rem 0.35rem;
+	text-align: left;
+}

@@ -1,0 +1,8 @@
+.DS_Store
+*.zip
+/vendor/
+/node_modules/
+/svn-checkout/
+Dist/
+.env
+.env.local
