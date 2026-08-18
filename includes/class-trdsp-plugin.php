@@ -53,6 +53,7 @@ class TRDSP_Plugin {
 		TRDSP_Privacy::hooks();
 		TRDSP_Booking::hooks();
 		TRDSP_Portal::hooks();
+		TRDSP_Blocks::hooks();
 		TRDSP_REST::hooks();
 		if ( is_admin() ) {
 			$this->admin = new TRDSP_Admin();
@@ -98,7 +99,7 @@ class TRDSP_Plugin {
 		if ( ! function_exists( 'wp_add_privacy_policy_content' ) ) {
 			return;
 		}
-		$content = '<p>' . esc_html__( 'Trade Dispatch stores customer names, contact details, job addresses, service notes, and estimates on this site so the business can schedule and complete field work. Booking form submissions are emailed to the site owner with WordPress mail. Data stays on this WordPress installation unless the site owner connects a separately installed premium add-on.', 'trade-dispatch' ) . '</p>';
+		$content = '<p>' . esc_html__( 'Trade Dispatch stores customer names, contact details, job addresses, service notes, estimates, and a WordPress subscriber account (created on first booking) on this site so the business can schedule work and the customer can open the portal. Booking form submissions are emailed to the site owner with WordPress mail. Data stays on this WordPress installation unless the site owner connects a separately installed premium add-on.', 'trade-dispatch' ) . '</p>';
 		wp_add_privacy_policy_content( 'Trade Dispatch', wp_kses_post( $content ) );
 	}
 }

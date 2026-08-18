@@ -26,3 +26,69 @@
 .trdsp-wrap .trdsp-actions a {
 	margin-right: 8px;
 }
+
+.trdsp-wrap .trdsp-view-switch,
+.trdsp-wrap .trdsp-cal-nav {
+	margin: 1em 0;
+}
+
+.trdsp-wrap .trdsp-cal-nav .button {
+	margin-right: 8px;
+}
+
+.trdsp-wrap .trdsp-calendar {
+	table-layout: fixed;
+}
+
+.trdsp-wrap .trdsp-calendar th,
+.trdsp-wrap .trdsp-calendar td {
+	vertical-align: top;
+	width: 14.28%;
+}
+
+.trdsp-wrap .trdsp-cal-job {
+	display: block;
+	margin: 0 0 8px;
+	padding: 6px 8px;
+	background: #f0f0f1;
+	text-decoration: none;
+	color: #1d2327;
+	border-left: 3px solid #2271b1;
+}
+
+.trdsp-wrap .trdsp-cal-empty {
+	color: #8c8f94;
+}
+
+.trdsp-wrap .trdsp-cal-add {
+	display: inline-block;
+	margin-top: 6px;
+	font-size: 12px;
+}
+
+.trdsp-wrap .trdsp-calendar-month td {
+	min-height: 8em;
+}
+
+.trdsp-wrap .trdsp-cal-day {
+	font-weight: 600;
+	margin-bottom: 6px;
+}
+
+.trdsp-wrap .trdsp-cal-out {
+	background: #f6f7f7;
+	color: #8c8f94;
+}
+
+.trdsp-wrap .trdsp-notes {
+	margin: 0 0 1.5em;
+	padding: 0;
+	list-style: none;
+}
+
+.trdsp-wrap .trdsp-notes li {
+	margin: 0 0 1em;
+	padding: 0.75em 1em;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+}

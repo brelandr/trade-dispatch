@@ -7,10 +7,18 @@ REMOTE="tradedispatch:/home/tradedispatch/public_html/wp-content/plugins/trade-d
 
 echo "Deploying Trade Dispatch → ${REMOTE}"
 
+# Includes first so a live require_once cannot race a missing class file.
+rsync -az \
+	--exclude '.DS_Store' \
+	"${ROOT}/includes/" "${REMOTE}includes/"
+
 rsync -az --delete \
 	--exclude '.git/' \
 	--exclude '.cursor/' \
 	--exclude '.cursorrules' \
+	--exclude '.gitignore' \
+	--exclude '.gitattributes' \
+	--exclude '.gitkeep' \
 	--exclude '.DS_Store' \
 	--exclude 'node_modules/' \
 	--exclude 'vendor/' \

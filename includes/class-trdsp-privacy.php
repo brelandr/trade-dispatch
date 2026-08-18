@@ -111,6 +111,55 @@ class TRDSP_Privacy {
 						),
 					),
 				);
+				$notes = TRDSP_Notes::for_job( (int) $job['id'] );
+				foreach ( $notes as $note ) {
+					$data[] = array(
+						'group_id'    => 'trdsp-notes',
+						'group_label' => __( 'Trade Dispatch Job Notes', 'trade-dispatch' ),
+						'item_id'     => 'note-' . (int) $note['id'],
+						'data'        => array(
+							array(
+								'name'  => __( 'Job', 'trade-dispatch' ),
+								'value' => (string) $job['title'],
+							),
+							array(
+								'name'  => __( 'Note', 'trade-dispatch' ),
+								'value' => (string) $note['note'],
+							),
+							array(
+								'name'  => __( 'Created', 'trade-dispatch' ),
+								'value' => (string) $note['created_at'],
+							),
+						),
+					);
+				}
+			}
+			$estimates = TRDSP_Estimates::query(
+				array(
+					'customer_id' => (int) $customer['id'],
+					'limit'       => 100,
+				)
+			);
+			foreach ( $estimates as $estimate ) {
+				$data[] = array(
+					'group_id'    => 'trdsp-estimates',
+					'group_label' => __( 'Trade Dispatch Estimates', 'trade-dispatch' ),
+					'item_id'     => 'estimate-' . (int) $estimate['id'],
+					'data'        => array(
+						array(
+							'name'  => __( 'Title', 'trade-dispatch' ),
+							'value' => (string) $estimate['title'],
+						),
+						array(
+							'name'  => __( 'Amount', 'trade-dispatch' ),
+							'value' => (string) $estimate['amount'],
+						),
+						array(
+							'name'  => __( 'Status', 'trade-dispatch' ),
+							'value' => (string) $estimate['status'],
+						),
+					),
+				);
 			}
 		}
 		return array(
@@ -142,6 +191,8 @@ class TRDSP_Privacy {
 				TRDSP_Jobs::delete( (int) $job['id'] );
 				++$removed;
 			}
+			TRDSP_Estimates::delete_for_customer( (int) $customer['id'] );
+			++$removed;
 			TRDSP_Customers::delete( (int) $customer['id'] );
 			++$removed;
 		}

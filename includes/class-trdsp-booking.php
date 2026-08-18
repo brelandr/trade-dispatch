@@ -36,7 +36,7 @@ class TRDSP_Booking {
 		if ( isset( $_GET['trdsp_booked'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Public thank-you flag only.
 			$flag = sanitize_key( wp_unslash( $_GET['trdsp_booked'] ) );
 			if ( '1' === $flag ) {
-				$notice = '<p class="trdsp-notice trdsp-notice-ok">' . esc_html__( 'Thanks — your booking request was sent.', 'trade-dispatch' ) . '</p>';
+				$notice = '<p class="trdsp-notice trdsp-notice-ok">' . esc_html__( 'Thanks — your booking request was sent. If this is your first visit, check your email for a login to the customer portal.', 'trade-dispatch' ) . '</p>';
 			} elseif ( 'error' === $flag ) {
 				$notice = '<p class="trdsp-notice trdsp-notice-err">' . esc_html__( 'Please fill in your name, email, and a service description.', 'trade-dispatch' ) . '</p>';
 			}
@@ -135,6 +135,8 @@ class TRDSP_Booking {
 			exit;
 		}
 
+		self::maybe_create_portal_user( $name, $email );
+
 		$job = TRDSP_Jobs::get( (int) $job_id );
 		if ( $job ) {
 			/**
@@ -148,5 +150,43 @@ class TRDSP_Booking {
 
 		wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_booked', '1', $redirect ) ) );
 		exit;
+	}
+
+	/**
+	 * Create a subscriber so the customer can open the portal.
+	 *
+	 * @param string $name  Display name.
+	 * @param string $email Email address.
+	 */
+	protected static function maybe_create_portal_user( $name, $email ) {
+		if ( email_exists( $email ) ) {
+			return;
+		}
+		$base = sanitize_user( (string) strstr( $email, '@', true ), true );
+		if ( strlen( $base ) < 2 ) {
+			$base = 'customer';
+		}
+		$login = $base;
+		$i     = 1;
+		while ( username_exists( $login ) ) {
+			$login = $base . $i;
+			++$i;
+			if ( $i > 50 ) {
+				$login = $base . wp_generate_password( 6, false, false );
+				break;
+			}
+		}
+		$user_id = wp_insert_user(
+			array(
+				'user_login'   => $login,
+				'user_email'   => $email,
+				'user_pass'    => wp_generate_password( 24, true ),
+				'display_name' => $name,
+				'role'         => 'subscriber',
+			)
+		);
+		if ( ! is_wp_error( $user_id ) ) {
+			wp_new_user_notification( $user_id, null, 'user' );
+		}
 	}
 }

@@ -34,6 +34,15 @@ class TRDSP_REST {
 				'permission_callback' => array( __CLASS__, 'portal_permission' ),
 			)
 		);
+		register_rest_route(
+			'trade-dispatch/v1',
+			'/portal/estimates',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( __CLASS__, 'portal_estimates' ),
+				'permission_callback' => array( __CLASS__, 'portal_permission' ),
+			)
+		);
 	}
 
 	/**
@@ -75,6 +84,39 @@ class TRDSP_REST {
 				'city'         => (string) $job['city'],
 				'state'        => (string) $job['state'],
 				'postcode'     => (string) $job['postcode'],
+				'upcoming'     => ( 'completed' !== $job['status'] && 'cancelled' !== $job['status'] ),
+			);
+		}
+		return rest_ensure_response( $output );
+	}
+
+	/**
+	 * Estimates for the customer matching the current user's email.
+	 *
+	 * @param \WP_REST_Request $request Request.
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public static function portal_estimates( $request ) {
+		unset( $request );
+		$user     = wp_get_current_user();
+		$customer = TRDSP_Customers::get_by_email( (string) $user->user_email );
+		if ( ! $customer ) {
+			return rest_ensure_response( array() );
+		}
+		$estimates = TRDSP_Estimates::query(
+			array(
+				'customer_id' => (int) $customer['id'],
+				'limit'       => 100,
+			)
+		);
+		$output    = array();
+		foreach ( $estimates as $estimate ) {
+			$output[] = array(
+				'id'     => (int) $estimate['id'],
+				'title'  => (string) $estimate['title'],
+				'amount' => (string) $estimate['amount'],
+				'status' => (string) $estimate['status'],
+				'job_id' => (int) $estimate['job_id'],
 			);
 		}
 		return rest_ensure_response( $output );

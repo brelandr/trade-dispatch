@@ -1,6 +1,10 @@
-.trdsp-booking,
-.trdsp-portal {
+.trdsp-booking {
 	max-width: 40rem;
+	margin: 1.5rem 0;
+}
+
+.trdsp-portal {
+	max-width: 52rem;
 	margin: 1.5rem 0;
 }
 
@@ -64,4 +68,30 @@
 	border-bottom: 1px solid #dcdcde;
 	padding: 0.5rem 0.35rem;
 	text-align: left;
+}
+
+.trdsp-reschedule {
+	margin: 0;
+}
+
+.trdsp-reschedule summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.trdsp-reschedule .trdsp-form {
+	margin-top: 0.75rem;
+}
+
+.trdsp-visit {
+	margin: 0;
+}
+
+.trdsp-visit summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.trdsp-visit p {
+	margin: 0.5rem 0 0;
 }

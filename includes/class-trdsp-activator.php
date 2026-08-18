@@ -24,6 +24,7 @@ class TRDSP_Activator {
 			array(
 				'delete_data_on_uninstall' => false,
 				'notify_email'             => '',
+				'business_name'            => '',
 			),
 			'',
 			false

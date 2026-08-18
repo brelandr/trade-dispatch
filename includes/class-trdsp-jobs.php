@@ -91,6 +91,7 @@ class TRDSP_Jobs {
 				'from'             => '',
 				'to'               => '',
 				'has_recurrence'   => false,
+				'search'           => '',
 				'limit'            => 50,
 				'offset'           => 0,
 			)
@@ -123,6 +124,14 @@ class TRDSP_Jobs {
 		}
 		if ( ! empty( $args['has_recurrence'] ) ) {
 			$where[] = "recurrence <> ''";
+		}
+		$search = sanitize_text_field( (string) $args['search'] );
+		if ( '' !== $search ) {
+			$like     = '%' . $wpdb->esc_like( $search ) . '%';
+			$where[]  = '(title LIKE %s OR address_1 LIKE %s OR city LIKE %s)';
+			$params[] = $like;
+			$params[] = $like;
+			$params[] = $like;
 		}
 		$limit  = min( 200, max( 1, absint( $args['limit'] ) ) );
 		$offset = max( 0, absint( $args['offset'] ) );
@@ -229,6 +238,19 @@ class TRDSP_Jobs {
 		 */
 		do_action( 'trdsp_after_job_save', $id, $row );
 
+		$prev_assignee = $previous ? (int) $previous['assigned_user_id'] : 0;
+		$new_assignee  = (int) $row['assigned_user_id'];
+		if ( $new_assignee > 0 && $new_assignee !== $prev_assignee ) {
+			/**
+			 * Fires when a job is assigned (or reassigned) to a crew member.
+			 *
+			 * @param int                  $id           Job ID.
+			 * @param array<string,mixed> $row          Saved row.
+			 * @param int                  $new_assignee User ID.
+			 */
+			do_action( 'trdsp_job_assigned', $id, $row, $new_assignee );
+		}
+
 		$became_completed = ( 'completed' === $row['status'] && ( ! $previous || 'completed' !== $previous['status'] ) );
 		if ( $became_completed ) {
 			do_action( 'trdsp_job_completed', $id, $row );
@@ -254,6 +276,9 @@ class TRDSP_Jobs {
 		}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table delete.
 		$deleted = $wpdb->delete( self::table(), array( 'id' => $id ), array( '%d' ) );
+		if ( false !== $deleted ) {
+			TRDSP_Notes::delete_for_job( $id );
+		}
 		return false !== $deleted;
 	}
 
