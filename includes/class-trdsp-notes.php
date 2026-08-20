@@ -39,7 +39,7 @@ class TRDSP_Notes {
 		$table = self::table();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table list.
 		$rows = $wpdb->get_results(
-			$wpdb->prepare( "SELECT * FROM {$table} WHERE job_id = %d ORDER BY id DESC LIMIT 100", $job_id ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table from prefix + fixed slug.
+			$wpdb->prepare( 'SELECT * FROM %i WHERE job_id = %d ORDER BY id DESC LIMIT 100', $table, $job_id ),
 			ARRAY_A
 		);
 		return is_array( $rows ) ? $rows : array();
@@ -63,19 +63,25 @@ class TRDSP_Notes {
 		if ( empty( $ids ) ) {
 			return array();
 		}
-		$table        = self::table();
-		$ids          = array_values( $ids );
-		$placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table list.
-		$sql  = "SELECT n.* FROM {$table} n INNER JOIN ( SELECT job_id, MAX(id) AS max_id FROM {$table} WHERE job_id IN ({$placeholders}) GROUP BY job_id ) t ON n.id = t.max_id"; // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table from prefix + fixed slug; placeholders are %d only.
+		$table  = self::table();
+		$wanted = array_fill_keys( array_values( $ids ), true );
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$rows = $wpdb->get_results(
-			$wpdb->prepare( $sql, ...$ids ),
+			$wpdb->prepare(
+				'SELECT n.* FROM %i n INNER JOIN ( SELECT job_id, MAX(id) AS max_id FROM %i GROUP BY job_id ) t ON n.id = t.max_id',
+				$table,
+				$table
+			),
 			ARRAY_A
 		);
+		// phpcs:enable
 		$map = array();
 		if ( is_array( $rows ) ) {
 			foreach ( $rows as $row ) {
-				$map[ (int) $row['job_id'] ] = $row;
+				$job_id = (int) $row['job_id'];
+				if ( isset( $wanted[ $job_id ] ) ) {
+					$map[ $job_id ] = $row;
+				}
 			}
 		}
 		return $map;

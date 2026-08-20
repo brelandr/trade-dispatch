@@ -21,6 +21,29 @@ class TRDSP_Booking {
 		add_shortcode( 'trdsp_booking', array( __CLASS__, 'render' ) );
 		add_action( 'admin_post_trdsp_submit_booking', array( __CLASS__, 'handle' ) );
 		add_action( 'admin_post_nopriv_trdsp_submit_booking', array( __CLASS__, 'handle' ) );
+		add_action( 'trdsp_job_confirmed', array( __CLASS__, 'on_job_confirmed' ), 5, 2 );
+	}
+
+	/**
+	 * Enqueue booking JS with localized window strings (booking form and portal chips).
+	 */
+	public static function enqueue_public_script() {
+		wp_enqueue_script( 'trdsp-booking' );
+		$window = self::window_config();
+		wp_localize_script(
+			'trdsp-booking',
+			'trdspBooking',
+			array(
+				/* translators: %d: Typical visit duration in minutes. */
+				'minutesLabel' => __( 'Typical visit: about %d minutes', 'trade-dispatch' ),
+				'outsideHours' => __( 'That time is outside posted hours. You can still send the request — the office will confirm.', 'trade-dispatch' ),
+				'busyDay'      => __( 'Another visit is already on the calendar near that time. You can still send the request.', 'trade-dispatch' ),
+				'open'         => $window['open'],
+				'close'        => $window['close'],
+				'days'         => $window['days'],
+				'occupied'     => $window['occupied'],
+			)
+		);
 	}
 
 	/**
@@ -32,30 +55,18 @@ class TRDSP_Booking {
 	public static function render( $atts ) {
 		unset( $atts );
 		wp_enqueue_style( 'trdsp-public' );
-		wp_enqueue_script( 'trdsp-booking' );
-		$window = self::window_config();
-		wp_localize_script(
-			'trdsp-booking',
-			'trdspBooking',
-			array(
-				'minutesLabel' => __( 'Typical visit: about %d minutes', 'trade-dispatch' ),
-				'outsideHours' => __( 'That time is outside posted hours. You can still send the request — the office will confirm.', 'trade-dispatch' ),
-				'busyDay'      => __( 'Another visit is already on the calendar near that time. You can still send the request.', 'trade-dispatch' ),
-				'open'         => $window['open'],
-				'close'        => $window['close'],
-				'days'         => $window['days'],
-				'occupied'     => $window['occupied'],
-			)
-		);
+		self::enqueue_public_script();
 		$settings = get_option( 'trdsp_settings', array() );
 		$hours    = isset( $settings['booking_hours_hint'] ) ? sanitize_textarea_field( (string) $settings['booking_hours_hint'] ) : '';
 		$notice   = '';
-		if ( isset( $_GET['trdsp_booked'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Public thank-you flag only.
-			$flag = sanitize_key( wp_unslash( $_GET['trdsp_booked'] ) );
+		$flag = isset( $_GET['trdsp_booked'] ) ? sanitize_key( wp_unslash( $_GET['trdsp_booked'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Public thank-you flag only.
+		if ( '' !== $flag ) {
 			if ( '1' === $flag ) {
-				$notice = '<p class="trdsp-notice trdsp-notice-ok">' . esc_html__( 'Thanks — your booking request was sent. If this is your first visit, check your email for a login to the customer portal.', 'trade-dispatch' ) . '</p>';
+				$notice = '<p class="trdsp-notice trdsp-notice-ok">' . esc_html__( 'Thanks — your booking request was sent. The office will confirm a visit time.', 'trade-dispatch' ) . '</p>';
 			} elseif ( 'window' === $flag ) {
 				$notice = '<p class="trdsp-notice trdsp-notice-ok">' . esc_html__( 'Thanks — your request was sent. That time is outside posted hours or already busy; the office will confirm a visit time.', 'trade-dispatch' ) . '</p>';
+			} elseif ( 'limit' === $flag ) {
+				$notice = '<p class="trdsp-notice trdsp-notice-err">' . esc_html__( 'Too many booking requests from this connection. Please wait a few minutes and try again.', 'trade-dispatch' ) . '</p>';
 			} elseif ( 'error' === $flag ) {
 				$notice = '<p class="trdsp-notice trdsp-notice-err">' . esc_html__( 'Please fill in your name, email, and a service description.', 'trade-dispatch' ) . '</p>';
 			}
@@ -121,6 +132,13 @@ class TRDSP_Booking {
 	 */
 	public static function handle() {
 		$redirect = wp_get_referer() ? wp_get_referer() : home_url( '/' );
+		/*
+		 * Public, unauthenticated form: a missing or expired nonce here is
+		 * almost always a cached page or a timed-out form, not an attack, and
+		 * no privileged action has run yet. Send the visitor back to the form
+		 * with a friendly error rather than wp_die(). (The authenticated admin
+		 * handlers use wp_die() instead, where a bad nonce signals tampering.)
+		 */
 		if ( ! isset( $_POST['trdsp_booking_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['trdsp_booking_nonce'] ) ), 'trdsp_submit_booking' ) ) {
 			wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_booked', 'error', $redirect ) ) );
 			exit;
@@ -129,6 +147,11 @@ class TRDSP_Booking {
 		$honeypot = isset( $_POST['trdsp_website'] ) ? sanitize_text_field( wp_unslash( $_POST['trdsp_website'] ) ) : '';
 		if ( '' !== $honeypot ) {
 			wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_booked', '1', $redirect ) ) );
+			exit;
+		}
+
+		if ( self::is_rate_limited( 'ip', self::client_ip() ) ) {
+			wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_booked', 'limit', $redirect ) ) );
 			exit;
 		}
 
@@ -142,6 +165,11 @@ class TRDSP_Booking {
 		}
 		if ( '' === $name || '' === $email || ! is_email( $email ) || '' === $title ) {
 			wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_booked', 'error', $redirect ) ) );
+			exit;
+		}
+
+		if ( self::is_rate_limited( 'email', strtolower( $email ) ) ) {
+			wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_booked', 'limit', $redirect ) ) );
 			exit;
 		}
 
@@ -182,8 +210,6 @@ class TRDSP_Booking {
 			wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_booked', 'error', $redirect ) ) );
 			exit;
 		}
-
-		self::maybe_create_portal_user( $name, $email );
 
 		$job = TRDSP_Jobs::get( (int) $job_id );
 		if ( $job ) {
@@ -360,6 +386,61 @@ class TRDSP_Booking {
 			}
 			echo '</div>';
 		}
+	}
+
+	/**
+	 * Create the portal account after the office confirms the booking (not on the public form).
+	 *
+	 * @param int                  $job_id Job ID.
+	 * @param array<string,mixed> $job    Saved job row.
+	 */
+	public static function on_job_confirmed( $job_id, $job ) {
+		unset( $job_id );
+		$customer = class_exists( 'TRDSP_Customers' ) ? TRDSP_Customers::get( absint( $job['customer_id'] ?? 0 ) ) : null;
+		if ( ! $customer ) {
+			return;
+		}
+		self::maybe_create_portal_user( (string) $customer['name'], (string) $customer['email'] );
+	}
+
+	/**
+	 * Client IP for booking rate limits (do not trust forwarded headers).
+	 *
+	 * @return string
+	 */
+	protected static function client_ip() {
+		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+		return '' !== $ip ? $ip : 'unknown';
+	}
+
+	/**
+	 * Whether this IP or email has submitted too many public bookings.
+	 *
+	 * @param string $kind  ip|email.
+	 * @param string $value IP or email.
+	 * @return bool
+	 */
+	protected static function is_rate_limited( $kind, $value ) {
+		$limits = array(
+			'ip'    => array(
+				'max'  => 5,
+				'ttl'  => 15 * MINUTE_IN_SECONDS,
+			),
+			'email' => array(
+				'max'  => 3,
+				'ttl'  => HOUR_IN_SECONDS,
+			),
+		);
+		if ( ! isset( $limits[ $kind ] ) ) {
+			return false;
+		}
+		$key   = 'trdsp_book_' . $kind . '_' . md5( (string) $value );
+		$count = (int) get_transient( $key );
+		if ( $count >= (int) $limits[ $kind ]['max'] ) {
+			return true;
+		}
+		set_transient( $key, $count + 1, (int) $limits[ $kind ]['ttl'] );
+		return false;
 	}
 
 	/**

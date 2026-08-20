@@ -35,6 +35,7 @@ class TRDSP_Admin {
 		add_action( 'admin_post_trdsp_duplicate_job', array( $this, 'handle_duplicate_job' ) );
 		add_action( 'admin_post_trdsp_confirm_booking', array( $this, 'handle_confirm_booking' ) );
 		add_action( 'admin_post_trdsp_apply_preferred', array( $this, 'handle_apply_preferred' ) );
+		add_action( 'admin_post_trdsp_create_setup_page', array( $this, 'handle_create_setup_page' ) );
 		add_action( 'wp_dashboard_setup', array( $this, 'register_dashboard_widget' ) );
 	}
 
@@ -52,6 +53,13 @@ class TRDSP_Admin {
 			TRDSP_PLUGIN_URL . 'assets/css/trdsp-admin.css',
 			array(),
 			TRDSP_VERSION
+		);
+		wp_enqueue_script(
+			'trdsp-admin-confirm',
+			TRDSP_PLUGIN_URL . 'assets/js/trdsp-admin-confirm.js',
+			array(),
+			TRDSP_VERSION,
+			true
 		);
 		$view = isset( $_GET['trdsp_view'] ) ? sanitize_key( wp_unslash( $_GET['trdsp_view'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Asset view only.
 		if ( 'print' === $view ) {
@@ -82,8 +90,8 @@ class TRDSP_Admin {
 		if ( ! $screen || false === strpos( (string) $screen->id, 'trade-dispatch' ) ) {
 			return;
 		}
-		if ( isset( $_GET['trdsp_notice'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display flag only.
-			$key      = sanitize_key( wp_unslash( $_GET['trdsp_notice'] ) );
+		$key = isset( $_GET['trdsp_notice'] ) ? sanitize_key( wp_unslash( $_GET['trdsp_notice'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Redirect flash key; allow-listed below.
+		if ( '' !== $key ) {
 			$messages = array(
 				'customer_saved'    => __( 'Customer saved.', 'trade-dispatch' ),
 				'customer_deleted'  => __( 'Customer deleted.', 'trade-dispatch' ),
@@ -106,6 +114,10 @@ class TRDSP_Admin {
 				'test_sent'         => __( 'Test email sent to your WordPress account address.', 'trade-dispatch' ),
 				'test_no_email'     => __( 'Your WordPress user needs an email address before a test can be sent.', 'trade-dispatch' ),
 				'template_restored' => __( 'That template now uses the default again.', 'trade-dispatch' ),
+				'saved'             => __( 'Service saved.', 'trade-dispatch' ),
+				'deleted'           => __( 'Service deleted.', 'trade-dispatch' ),
+				'page_created'      => __( 'Page created. Add it to a menu if you want it in the site navigation.', 'trade-dispatch' ),
+				'page_exists'       => __( 'That page already exists. The portal setting was updated if needed.', 'trade-dispatch' ),
 				'error'             => __( 'Something went wrong. Check required fields and try again.', 'trade-dispatch' ),
 			);
 			if ( isset( $messages[ $key ] ) ) {
@@ -322,6 +334,7 @@ class TRDSP_Admin {
 		$from     = isset( $_GET['trdsp_from'] ) ? sanitize_text_field( wp_unslash( $_GET['trdsp_from'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Filter.
 		$to       = isset( $_GET['trdsp_to'] ) ? sanitize_text_field( wp_unslash( $_GET['trdsp_to'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Filter.
 		$assignee = isset( $_GET['trdsp_crew'] ) ? absint( wp_unslash( $_GET['trdsp_crew'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Filter.
+		$customer = isset( $_GET['trdsp_customer'] ) ? absint( wp_unslash( $_GET['trdsp_customer'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Filter.
 		$search    = isset( $_GET['trdsp_q'] ) ? sanitize_text_field( wp_unslash( $_GET['trdsp_q'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Filter.
 		$preferred = isset( $_GET['trdsp_preferred'] ) && '1' === sanitize_key( wp_unslash( $_GET['trdsp_preferred'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Filter.
 		$office    = TRDSP_Roles::can_manage_office();
@@ -344,6 +357,7 @@ class TRDSP_Admin {
 					'from'             => $from ? $from . ' 00:00:00' : '',
 					'to'               => $to ? $to . ' 23:59:59' : '',
 					'assigned_user_id' => $assignee,
+					'customer_id'      => $office ? $customer : 0,
 					'search'           => $search,
 					'limit'            => 100,
 				)
@@ -380,7 +394,7 @@ class TRDSP_Admin {
 			echo ' <a class="page-title-action" href="' . esc_url( $times ) . '">' . esc_html__( 'Time requests', 'trade-dispatch' ) . '</a>';
 			$this->render_jobs_view_switch( 'list' );
 		}
-		if ( '' === $from && '' === $to && '' === $status && '' === $search && ( $office ? $assignee < 1 : true ) ) {
+		if ( '' === $from && '' === $to && '' === $status && '' === $search && ( $office ? $assignee < 1 && $customer < 1 : true ) ) {
 			$today      = wp_date( 'Y-m-d' );
 			$today_args = array(
 				'from'  => $today . ' 00:00:00',
@@ -419,6 +433,12 @@ class TRDSP_Admin {
 				echo '<option value="' . esc_attr( (string) $user->ID ) . '" ' . selected( $assignee, (int) $user->ID, false ) . '>' . esc_html( $user->display_name ) . '</option>';
 			}
 			echo '</select> ';
+			echo '<label class="screen-reader-text" for="trdsp_customer">' . esc_html__( 'Customer', 'trade-dispatch' ) . '</label>';
+			echo '<select id="trdsp_customer" name="trdsp_customer"><option value="0">' . esc_html__( 'All customers', 'trade-dispatch' ) . '</option>';
+			foreach ( TRDSP_Customers::query( array( 'limit' => 200 ) ) as $cust ) {
+				echo '<option value="' . esc_attr( (string) $cust['id'] ) . '" ' . selected( $customer, (int) $cust['id'], false ) . '>' . esc_html( (string) $cust['name'] ) . '</option>';
+			}
+			echo '</select> ';
 		}
 		echo '<label class="screen-reader-text" for="trdsp_q">' . esc_html__( 'Search jobs', 'trade-dispatch' ) . '</label>';
 		echo '<input type="search" id="trdsp_q" name="trdsp_q" value="' . esc_attr( $search ) . '" placeholder="' . esc_attr__( 'Search title or address', 'trade-dispatch' ) . '" /> ';
@@ -452,6 +472,7 @@ class TRDSP_Admin {
 		echo '<th>' . esc_html__( 'Customer', 'trade-dispatch' ) . '</th>';
 		echo '<th>' . esc_html__( 'Crew', 'trade-dispatch' ) . '</th>';
 		echo '<th>' . esc_html__( 'Latest note', 'trade-dispatch' ) . '</th>';
+		echo '<th>' . esc_html__( 'Brief', 'trade-dispatch' ) . '</th>';
 		echo '<th>' . esc_html__( 'Status', 'trade-dispatch' ) . '</th>';
 		do_action( 'trdsp_jobs_list_headers' );
 		echo '<th>' . esc_html__( 'Actions', 'trade-dispatch' ) . '</th>';
@@ -505,6 +526,14 @@ class TRDSP_Admin {
 				echo '—';
 			}
 			echo '</td>';
+			$brief = trim( (string) ( $job['office_brief'] ?? '' ) );
+			echo '<td class="trdsp-latest-note">';
+			if ( '' !== $brief ) {
+				echo esc_html( wp_html_excerpt( $brief, 80, '…' ) );
+			} else {
+				echo '—';
+			}
+			echo '</td>';
 			$pref = TRDSP_Jobs::get_preferred_at( (int) $job['id'] );
 			echo '<td>' . esc_html( isset( $statuses[ $job['status'] ] ) ? $statuses[ $job['status'] ] : (string) $job['status'] );
 			if ( '' !== $pref ) {
@@ -541,7 +570,7 @@ class TRDSP_Admin {
 			}
 			if ( $office ) {
 				echo '<a href="' . esc_url( $dup ) . '">' . esc_html__( 'Duplicate', 'trade-dispatch' ) . '</a>';
-				echo '<a href="' . esc_url( $del ) . '" onclick="return confirm(\'' . esc_js( __( 'Delete this job?', 'trade-dispatch' ) ) . '\');">' . esc_html__( 'Delete', 'trade-dispatch' ) . '</a>';
+				echo '<a href="' . esc_url( $del ) . '" data-trdsp-confirm="' . esc_attr( __( 'Delete this job?', 'trade-dispatch' ) ) . '">' . esc_html__( 'Delete', 'trade-dispatch' ) . '</a>';
 			}
 			echo '</td>';
 			echo '</tr>';
@@ -561,11 +590,14 @@ class TRDSP_Admin {
 			return;
 		}
 		$job       = $job ? $job : array();
-		if ( $id < 1 && empty( $job['customer_id'] ) && isset( $_GET['customer_id'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Prefill only.
-			$job['customer_id'] = absint( wp_unslash( $_GET['customer_id'] ) );
+		if ( $id < 1 && empty( $job['customer_id'] ) ) {
+			$prefill_customer = isset( $_GET['customer_id'] ) ? absint( wp_unslash( $_GET['customer_id'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Prefill new form only; save uses trdsp_save_job nonce.
+			if ( $prefill_customer > 0 ) {
+				$job['customer_id'] = $prefill_customer;
+			}
 		}
-		if ( $id < 1 && empty( $job['scheduled_at'] ) && isset( $_GET['trdsp_scheduled'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Prefill only.
-			$day = sanitize_text_field( wp_unslash( $_GET['trdsp_scheduled'] ) );
+		if ( $id < 1 && empty( $job['scheduled_at'] ) ) {
+			$day = isset( $_GET['trdsp_scheduled'] ) ? sanitize_text_field( wp_unslash( $_GET['trdsp_scheduled'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Prefill new form only; save uses trdsp_save_job nonce.
 			if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $day ) ) {
 				$job['scheduled_at'] = $day . ' 09:00:00';
 			}
@@ -667,6 +699,9 @@ class TRDSP_Admin {
 			echo '<textarea name="gate_notes" id="gate_notes" class="large-text" rows="3">' . esc_textarea( (string) ( $job['gate_notes'] ?? '' ) ) . '</textarea></td></tr>';
 			echo '<tr><th scope="row"><label for="hazard_notes">' . esc_html__( 'Hazards', 'trade-dispatch' ) . '</label></th><td>';
 			echo '<textarea name="hazard_notes" id="hazard_notes" class="large-text" rows="3">' . esc_textarea( (string) ( $job['hazard_notes'] ?? '' ) ) . '</textarea></td></tr>';
+			echo '<tr><th scope="row"><label for="office_brief">' . esc_html__( 'Office brief', 'trade-dispatch' ) . '</label></th><td>';
+			echo '<textarea name="office_brief" id="office_brief" class="large-text" rows="3">' . esc_textarea( (string) ( $job['office_brief'] ?? '' ) ) . '</textarea>';
+			echo '<p class="description">' . esc_html__( 'Shown to the assigned crew on the work order, assignment email, and Trade Dispatch Tech. Not shown in the customer portal.', 'trade-dispatch' ) . '</p></td></tr>';
 			echo '<tr><th scope="row"><label for="recurrence">' . esc_html__( 'Recurring', 'trade-dispatch' ) . '</label></th><td><select name="recurrence" id="recurrence">';
 			$current_rec = (string) ( $job['recurrence'] ?? '' );
 			foreach ( TRDSP_Jobs::recurrences() as $key => $label ) {
@@ -681,6 +716,9 @@ class TRDSP_Admin {
 			}
 			if ( ! empty( $job['hazard_notes'] ) ) {
 				echo '<tr><th scope="row">' . esc_html__( 'Hazards', 'trade-dispatch' ) . '</th><td>' . esc_html( (string) $job['hazard_notes'] ) . '</td></tr>';
+			}
+			if ( ! empty( $job['office_brief'] ) ) {
+				echo '<tr><th scope="row">' . esc_html__( 'Office brief', 'trade-dispatch' ) . '</th><td>' . esc_html( (string) $job['office_brief'] ) . '</td></tr>';
 			}
 		}
 		echo '</table>';
@@ -708,7 +746,20 @@ class TRDSP_Admin {
 				),
 				admin_url( 'admin.php' )
 			);
-			echo '<p><a class="button" href="' . esc_url( $print ) . '">' . esc_html__( 'Print work order', 'trade-dispatch' ) . '</a></p>';
+			echo '<p><a class="button" href="' . esc_url( $print ) . '">' . esc_html__( 'Print work order', 'trade-dispatch' ) . '</a>';
+			if ( $office && class_exists( 'TRDSP_Estimates' ) && TRDSP_Roles::can_manage_estimates() ) {
+				$new_est = add_query_arg(
+					array(
+						'page'        => 'trade-dispatch-estimates',
+						'trdsp_view'  => 'add',
+						'job_id'      => $id,
+						'customer_id' => (int) ( $job['customer_id'] ?? 0 ),
+					),
+					admin_url( 'admin.php' )
+				);
+				echo ' <a class="button" href="' . esc_url( $new_est ) . '">' . esc_html__( 'Add estimate', 'trade-dispatch' ) . '</a>';
+			}
+			echo '</p>';
 			$this->render_job_notes( $id );
 			/**
 			 * After job notes on the job edit screen.
@@ -1158,6 +1209,9 @@ class TRDSP_Admin {
 		if ( ! empty( $job['hazard_notes'] ) ) {
 			echo '<dt>' . esc_html__( 'Hazards', 'trade-dispatch' ) . '</dt><dd>' . esc_html( (string) $job['hazard_notes'] ) . '</dd>';
 		}
+		if ( ! empty( $job['office_brief'] ) ) {
+			echo '<dt>' . esc_html__( 'Office brief', 'trade-dispatch' ) . '</dt><dd>' . esc_html( (string) $job['office_brief'] ) . '</dd>';
+		}
 		echo '</dl>';
 		do_action( 'trdsp_work_order_after_details', $job );
 		if ( ! empty( $notes ) ) {
@@ -1273,7 +1327,7 @@ class TRDSP_Admin {
 			echo '<td>' . esc_html( (string) $customer['phone'] ) . '</td>';
 			echo '<td>' . esc_html( (string) $customer['city'] ) . '</td>';
 			echo '<td class="trdsp-actions"><a href="' . esc_url( $edit ) . '">' . esc_html__( 'Edit', 'trade-dispatch' ) . '</a>';
-			echo '<a href="' . esc_url( $del ) . '" onclick="return confirm(\'' . esc_js( __( 'Delete this customer?', 'trade-dispatch' ) ) . '\');">' . esc_html__( 'Delete', 'trade-dispatch' ) . '</a></td>';
+			echo '<a href="' . esc_url( $del ) . '" data-trdsp-confirm="' . esc_attr( __( 'Delete this customer?', 'trade-dispatch' ) ) . '">' . esc_html__( 'Delete', 'trade-dispatch' ) . '</a></td>';
 			echo '</tr>';
 		}
 		echo '</tbody></table></div>';
@@ -1491,7 +1545,7 @@ class TRDSP_Admin {
 				);
 				echo '<a href="' . esc_url( $convert ) . '">' . esc_html__( 'Create job', 'trade-dispatch' ) . '</a>';
 			}
-			echo '<a href="' . esc_url( $del ) . '" onclick="return confirm(\'' . esc_js( __( 'Delete this estimate?', 'trade-dispatch' ) ) . '\');">' . esc_html__( 'Delete', 'trade-dispatch' ) . '</a></td>';
+			echo '<a href="' . esc_url( $del ) . '" data-trdsp-confirm="' . esc_attr( __( 'Delete this estimate?', 'trade-dispatch' ) ) . '">' . esc_html__( 'Delete', 'trade-dispatch' ) . '</a></td>';
 			echo '</tr>';
 		}
 		echo '</tbody></table></div>';
@@ -1509,6 +1563,27 @@ class TRDSP_Admin {
 			return;
 		}
 		$estimate  = $estimate ? $estimate : array();
+		if ( $id < 1 && empty( $estimate['customer_id'] ) ) {
+			$prefill_customer = isset( $_GET['customer_id'] ) ? absint( wp_unslash( $_GET['customer_id'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Prefill new form only; save uses trdsp_save_estimate nonce.
+			if ( $prefill_customer > 0 ) {
+				$estimate['customer_id'] = $prefill_customer;
+			}
+		}
+		if ( $id < 1 && empty( $estimate['job_id'] ) ) {
+			$prefill_job = isset( $_GET['job_id'] ) ? absint( wp_unslash( $_GET['job_id'] ) ) : 0; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Prefill new form only; save uses trdsp_save_estimate nonce.
+			if ( $prefill_job > 0 ) {
+				$estimate['job_id'] = $prefill_job;
+				$from_job           = TRDSP_Jobs::get( $prefill_job );
+				if ( $from_job ) {
+					if ( empty( $estimate['customer_id'] ) ) {
+						$estimate['customer_id'] = (int) $from_job['customer_id'];
+					}
+					if ( empty( $estimate['title'] ) ) {
+						$estimate['title'] = (string) $from_job['title'];
+					}
+				}
+			}
+		}
 		$customers = TRDSP_Customers::query( array( 'limit' => 200 ) );
 		$jobs      = TRDSP_Jobs::query( array( 'limit' => 200 ) );
 		echo '<div class="wrap trdsp-wrap">';
@@ -1721,15 +1796,23 @@ class TRDSP_Admin {
 		echo '<p class="description">' . esc_html__( 'Leave all unchecked to accept any weekday. Requests are still stored if a customer picks another day.', 'trade-dispatch' ) . '</p></td></tr>';
 		$portal_id = isset( $settings['portal_page_id'] ) ? absint( $settings['portal_page_id'] ) : 0;
 		echo '<tr><th scope="row"><label for="trdsp_portal_page_id">' . esc_html__( 'Customer portal page', 'trade-dispatch' ) . '</label></th><td>';
-		wp_dropdown_pages(
+		echo '<select name="trdsp_settings[portal_page_id]" id="trdsp_portal_page_id">';
+		echo '<option value="0">' . esc_html__( '— Home page —', 'trade-dispatch' ) . '</option>';
+		$portal_pages = get_pages(
 			array(
-				'name'              => 'trdsp_settings[portal_page_id]',
-				'id'                => 'trdsp_portal_page_id',
-				'selected'          => $portal_id,
-				'show_option_none'  => __( '— Home page —', 'trade-dispatch' ),
-				'option_none_value' => '0',
+				'sort_column' => 'post_title',
+				'number'      => 200,
 			)
 		);
+		if ( is_array( $portal_pages ) ) {
+			foreach ( $portal_pages as $portal_page ) {
+				$page_id = (int) $portal_page->ID;
+				echo '<option value="' . esc_attr( (string) $page_id ) . '"';
+				selected( $portal_id, $page_id );
+				echo '>' . esc_html( $portal_page->post_title ) . '</option>';
+			}
+		}
+		echo '</select>';
 		echo '<p class="description">' . esc_html__( 'Page that contains [trdsp_portal]. Customer-only logins go here. The link is added to booking, confirm, and estimate emails when a page is chosen.', 'trade-dispatch' ) . '</p></td></tr>';
 		echo '<tr><th scope="row">' . esc_html__( 'Shortcodes and blocks', 'trade-dispatch' ) . '</th><td>';
 		echo '<p><code>[trdsp_booking]</code> — ' . esc_html__( 'public booking form (also a Gutenberg block)', 'trade-dispatch' ) . '</p>';
@@ -1738,10 +1821,101 @@ class TRDSP_Admin {
 		echo '<tr><th scope="row">' . esc_html__( 'Uninstall', 'trade-dispatch' ) . '</th><td><label><input type="checkbox" name="trdsp_settings[delete_data_on_uninstall]" value="1" ';
 		checked( $delete );
 		echo ' /> ';
-		echo esc_html__( 'Delete customers, jobs, estimates, and notes when this plugin is deleted.', 'trade-dispatch' );
+		echo esc_html__( 'Delete all Trade Dispatch data when this plugin is deleted: customers, jobs, estimates, notes, services, email templates, settings, and the Customer / Employee / Dispatcher roles. Leave unchecked to keep everything if you delete the plugin.', 'trade-dispatch' );
 		echo '</label></td></tr></table>';
 		submit_button();
+		echo '</form>';
+		echo '<h2>' . esc_html__( 'Create pages', 'trade-dispatch' ) . '</h2>';
+		echo '<p>' . esc_html__( 'Creates a published WordPress page with the shortcode. Creating the portal page also selects it above.', 'trade-dispatch' ) . '</p>';
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline-block;margin-right:8px;">';
+		echo '<input type="hidden" name="action" value="trdsp_create_setup_page" />';
+		echo '<input type="hidden" name="trdsp_page" value="booking" />';
+		wp_nonce_field( 'trdsp_create_setup_page', 'trdsp_create_setup_page_nonce' );
+		submit_button( __( 'Create booking page', 'trade-dispatch' ), 'secondary', 'submit', false );
+		echo '</form> ';
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '" style="display:inline-block;">';
+		echo '<input type="hidden" name="action" value="trdsp_create_setup_page" />';
+		echo '<input type="hidden" name="trdsp_page" value="portal" />';
+		wp_nonce_field( 'trdsp_create_setup_page', 'trdsp_create_setup_page_nonce' );
+		submit_button( __( 'Create portal page', 'trade-dispatch' ), 'secondary', 'submit', false );
 		echo '</form></div>';
+	}
+
+	/**
+	 * Publish a booking or portal page with the matching shortcode.
+	 */
+	public function handle_create_setup_page() {
+		if ( ! isset( $_POST['trdsp_create_setup_page_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['trdsp_create_setup_page_nonce'] ) ), 'trdsp_create_setup_page' ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
+		if ( ! TRDSP_Roles::can_manage_settings() ) {
+			wp_die( esc_html__( 'Unauthorized.', 'trade-dispatch' ) );
+		}
+		$kind = isset( $_POST['trdsp_page'] ) ? sanitize_key( wp_unslash( $_POST['trdsp_page'] ) ) : '';
+		$map  = array(
+			'booking' => array(
+				'title'     => __( 'Book a visit', 'trade-dispatch' ),
+				'shortcode' => '[trdsp_booking]',
+			),
+			'portal'  => array(
+				'title'     => __( 'Customer portal', 'trade-dispatch' ),
+				'shortcode' => '[trdsp_portal]',
+			),
+		);
+		if ( ! isset( $map[ $kind ] ) ) {
+			wp_die( esc_html__( 'Unknown page type.', 'trade-dispatch' ) );
+		}
+		$found = 0;
+		$pages = get_posts(
+			array(
+				'post_type'      => 'page',
+				'post_status'    => array( 'publish', 'draft' ),
+				'posts_per_page' => 50,
+				's'              => $map[ $kind ]['shortcode'],
+			)
+		);
+		foreach ( $pages as $page ) {
+			if ( false !== strpos( (string) $page->post_content, $map[ $kind ]['shortcode'] ) ) {
+				$found = (int) $page->ID;
+				break;
+			}
+		}
+		$notice = 'page_exists';
+		if ( $found < 1 ) {
+			$found = (int) wp_insert_post(
+				array(
+					'post_title'   => $map[ $kind ]['title'],
+					'post_content' => $map[ $kind ]['shortcode'],
+					'post_status'  => 'publish',
+					'post_type'    => 'page',
+				),
+				true
+			);
+			if ( is_wp_error( $found ) || $found < 1 ) {
+				$found  = 0;
+				$notice = 'error';
+			} else {
+				$notice = 'page_created';
+			}
+		}
+		if ( $found > 0 && 'portal' === $kind ) {
+			$settings                   = get_option( 'trdsp_settings', array() );
+			$settings                   = is_array( $settings ) ? $settings : array();
+			$settings['portal_page_id'] = $found;
+			update_option( 'trdsp_settings', $settings );
+		}
+		wp_safe_redirect(
+			esc_url_raw(
+				add_query_arg(
+					array(
+						'page'         => 'trade-dispatch-settings',
+						'trdsp_notice' => $notice,
+					),
+					admin_url( 'admin.php' )
+				)
+			)
+		);
+		exit;
 	}
 
 	/**
@@ -1799,13 +1973,17 @@ class TRDSP_Admin {
 	 * Delete customer.
 	 */
 	public function handle_delete_customer() {
+		if ( ! isset( $_GET['_wpnonce'] ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
 		$id = isset( $_GET['customer_id'] ) ? absint( wp_unslash( $_GET['customer_id'] ) ) : 0;
-		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_delete_customer_' . $id ) ) {
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_delete_customer_' . $id ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
 		if ( ! TRDSP_Roles::can_manage_customers() ) {
 			wp_die( esc_html__( 'Unauthorized.', 'trade-dispatch' ) );
 		}
+		TRDSP_Jobs::delete_for_customer( $id );
 		TRDSP_Estimates::delete_for_customer( $id );
 		TRDSP_Customers::delete( $id );
 		wp_safe_redirect(
@@ -1846,6 +2024,7 @@ class TRDSP_Admin {
 					'postcode'         => isset( $_POST['postcode'] ) ? sanitize_text_field( wp_unslash( $_POST['postcode'] ) ) : '',
 					'gate_notes'       => isset( $_POST['gate_notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['gate_notes'] ) ) : '',
 					'hazard_notes'     => isset( $_POST['hazard_notes'] ) ? sanitize_textarea_field( wp_unslash( $_POST['hazard_notes'] ) ) : '',
+					'office_brief'     => isset( $_POST['office_brief'] ) ? sanitize_textarea_field( wp_unslash( $_POST['office_brief'] ) ) : '',
 					'recurrence'       => isset( $_POST['recurrence'] ) ? sanitize_key( wp_unslash( $_POST['recurrence'] ) ) : '',
 				)
 			);
@@ -1875,8 +2054,11 @@ class TRDSP_Admin {
 	 * Delete job.
 	 */
 	public function handle_delete_job() {
+		if ( ! isset( $_GET['_wpnonce'] ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
 		$id = isset( $_GET['job_id'] ) ? absint( wp_unslash( $_GET['job_id'] ) ) : 0;
-		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_delete_job_' . $id ) ) {
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_delete_job_' . $id ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
 		if ( ! TRDSP_Roles::can_manage_office() ) {
@@ -1958,8 +2140,11 @@ class TRDSP_Admin {
 	 * Delete estimate.
 	 */
 	public function handle_delete_estimate() {
+		if ( ! isset( $_GET['_wpnonce'] ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
 		$id = isset( $_GET['estimate_id'] ) ? absint( wp_unslash( $_GET['estimate_id'] ) ) : 0;
-		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_delete_estimate_' . $id ) ) {
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_delete_estimate_' . $id ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
 		if ( ! TRDSP_Roles::can_manage_estimates() ) {
@@ -1987,8 +2172,11 @@ class TRDSP_Admin {
 	 * Create a scheduled job from an estimate and link them.
 	 */
 	public function handle_convert_estimate() {
+		if ( ! isset( $_GET['_wpnonce'] ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
 		$id = isset( $_GET['estimate_id'] ) ? absint( wp_unslash( $_GET['estimate_id'] ) ) : 0;
-		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_convert_estimate_' . $id ) ) {
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_convert_estimate_' . $id ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
 		if ( ! TRDSP_Roles::can_manage_estimates() ) {
@@ -2083,8 +2271,11 @@ class TRDSP_Admin {
 	 * Email an estimate to the customer (quote only — no charge).
 	 */
 	public function handle_send_estimate() {
+		if ( ! isset( $_GET['_wpnonce'] ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
 		$id = isset( $_GET['estimate_id'] ) ? absint( wp_unslash( $_GET['estimate_id'] ) ) : 0;
-		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_send_estimate_' . $id ) ) {
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_send_estimate_' . $id ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
 		if ( ! TRDSP_Roles::can_manage_estimates() ) {
@@ -2170,8 +2361,11 @@ class TRDSP_Admin {
 	 * Re-email a sent estimate (does not fire trdsp_estimate_sent).
 	 */
 	public function handle_remind_estimate() {
+		if ( ! isset( $_GET['_wpnonce'] ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
 		$id = isset( $_GET['estimate_id'] ) ? absint( wp_unslash( $_GET['estimate_id'] ) ) : 0;
-		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_remind_estimate_' . $id ) ) {
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_remind_estimate_' . $id ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
 		if ( ! TRDSP_Roles::can_manage_estimates() ) {
@@ -2231,8 +2425,11 @@ class TRDSP_Admin {
 	 * Duplicate a job (notes are not copied).
 	 */
 	public function handle_duplicate_job() {
+		if ( ! isset( $_GET['_wpnonce'] ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
 		$id = isset( $_GET['job_id'] ) ? absint( wp_unslash( $_GET['job_id'] ) ) : 0;
-		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_duplicate_job_' . $id ) ) {
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_duplicate_job_' . $id ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
 		if ( ! TRDSP_Roles::can_manage_office() ) {
@@ -2271,6 +2468,7 @@ class TRDSP_Admin {
 				'postcode'         => (string) ( $job['postcode'] ?? '' ),
 				'gate_notes'       => (string) ( $job['gate_notes'] ?? '' ),
 				'hazard_notes'     => (string) ( $job['hazard_notes'] ?? '' ),
+				'office_brief'     => (string) ( $job['office_brief'] ?? '' ),
 				'recurrence'       => (string) ( $job['recurrence'] ?? '' ),
 			)
 		);
@@ -2308,8 +2506,11 @@ class TRDSP_Admin {
 	 * Confirm a booking request (requested → scheduled).
 	 */
 	public function handle_confirm_booking() {
+		if ( ! isset( $_GET['_wpnonce'] ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
 		$id = isset( $_GET['job_id'] ) ? absint( wp_unslash( $_GET['job_id'] ) ) : 0;
-		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_confirm_booking_' . $id ) ) {
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_confirm_booking_' . $id ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
 		if ( ! TRDSP_Roles::can_manage_office() ) {
@@ -2363,8 +2564,11 @@ class TRDSP_Admin {
 	 * Copy the portal-requested time onto the job schedule.
 	 */
 	public function handle_apply_preferred() {
+		if ( ! isset( $_GET['_wpnonce'] ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
 		$id = isset( $_GET['job_id'] ) ? absint( wp_unslash( $_GET['job_id'] ) ) : 0;
-		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_apply_preferred_' . $id ) ) {
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_apply_preferred_' . $id ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
 		if ( ! TRDSP_Roles::can_manage_office() ) {
@@ -2530,6 +2734,10 @@ class TRDSP_Admin {
 			$when = ! empty( $job['scheduled_at'] ) ? wp_date( get_option( 'time_format' ), strtotime( (string) $job['scheduled_at'] ) ) : '';
 			$label = trim( $when . ' ' . (string) $job['title'] );
 			echo '<li><a href="' . esc_url( $edit ) . '">' . esc_html( $label ) . '</a> — ' . esc_html( isset( $statuses[ $job['status'] ] ) ? $statuses[ $job['status'] ] : (string) $job['status'] );
+			$brief = trim( (string) ( $job['office_brief'] ?? '' ) );
+			if ( '' !== $brief ) {
+				echo ' — ' . esc_html( wp_html_excerpt( $brief, 48, '…' ) );
+			}
 			do_action( 'trdsp_dashboard_widget_job_meta', $job );
 			echo '</li>';
 		}

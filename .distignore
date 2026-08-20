@@ -1,0 +1,55 @@
+# Files and folders that must NOT ship in the WordPress.org distribution.
+# Used by ./create-both-plugins.sh and by `wp dist-archive`.
+
+# Version control
+.git
+.gitignore
+.gitattributes
+.github
+
+# Editor / AI tooling
+.cursor
+.cursorrules
+.vscode
+.idea
+.DS_Store
+
+# Build, deploy, and dev config
+deploy-to-hub.sh
+create-plugin-zip.sh
+create-both-plugins.sh
+.distignore
+composer.json
+composer.lock
+package.json
+package-lock.json
+phpcs.xml
+phpcs.xml.dist
+phpcs-security.xml
+phpunit.xml
+phpunit.xml.dist
+webpack.config.js
+eas.json
+app.json
+*.sh
+
+# Dependencies and build output (dev only)
+node_modules
+vendor
+Dist
+dist
+svn-checkout
+
+# Tests and dev docs (readme.txt is the WordPress.org readme, not README.md)
+tests
+docs
+README.md
+*.md
+
+# Archives, maps, and secrets
+*.zip
+*.map
+.env
+.env.local
+.github-pat.local
+Thumbs.db

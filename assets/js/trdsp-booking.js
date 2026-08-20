@@ -11,7 +11,7 @@
 		}
 		var opt = sel.options[sel.selectedIndex];
 		var minutes = opt ? parseInt(opt.getAttribute('data-minutes') || '0', 10) : 0;
-		var tpl = cfg.minutesLabel || 'Typical visit: about %d minutes';
+		var tpl = cfg.minutesLabel || '';
 		hint.textContent = minutes > 0 ? tpl.replace('%d', String(minutes)) : '';
 	}
 

@@ -300,11 +300,17 @@ class TRDSP_Roles {
 	 */
 	public static function save_user_roles( $user_id ) {
 		$user_id = absint( $user_id );
-		if ( $user_id < 1 || ! current_user_can( 'promote_users' ) || ! current_user_can( 'edit_user', $user_id ) ) {
+		if ( $user_id < 1 ) {
 			return;
 		}
-		if ( ! isset( $_POST['trdsp_user_roles_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['trdsp_user_roles_nonce'] ) ), 'trdsp_user_roles' ) ) {
+		if ( ! isset( $_POST['trdsp_user_roles_nonce'] ) ) {
 			return;
+		}
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['trdsp_user_roles_nonce'] ) ), 'trdsp_user_roles' ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
+		if ( ! current_user_can( 'promote_users' ) || ! current_user_can( 'edit_user', $user_id ) ) {
+			wp_die( esc_html__( 'Unauthorized.', 'trade-dispatch' ) );
 		}
 		$user = get_userdata( $user_id );
 		if ( ! $user ) {

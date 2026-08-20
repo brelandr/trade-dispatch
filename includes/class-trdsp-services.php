@@ -69,7 +69,7 @@ class TRDSP_Services {
 		global $wpdb;
 		$table = self::table();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table list.
-		$rows = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY name ASC LIMIT 200", ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table from prefix + fixed slug.
+		$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i ORDER BY name ASC LIMIT 200', $table ), ARRAY_A );
 		return is_array( $rows ) ? $rows : array();
 	}
 
@@ -87,7 +87,7 @@ class TRDSP_Services {
 		}
 		$table = self::table();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table lookup.
-		$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table from prefix + fixed slug.
+		$row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $table, $id ), ARRAY_A );
 		return is_array( $row ) ? $row : null;
 	}
 
@@ -120,7 +120,7 @@ class TRDSP_Services {
 		$name    = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
 		$desc    = isset( $_POST['description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['description'] ) ) : '';
 		$minutes = isset( $_POST['default_minutes'] ) ? absint( wp_unslash( $_POST['default_minutes'] ) ) : 60;
-		$amount  = isset( $_POST['default_amount'] ) ? (float) wp_unslash( $_POST['default_amount'] ) : 0;
+		$amount  = isset( $_POST['default_amount'] ) ? (float) sanitize_text_field( wp_unslash( $_POST['default_amount'] ) ) : 0;
 		if ( '' === $name ) {
 			wp_safe_redirect( esc_url_raw( add_query_arg( 'trdsp_notice', 'error', admin_url( 'admin.php?page=trade-dispatch-services' ) ) ) );
 			exit;
@@ -184,7 +184,7 @@ class TRDSP_Services {
 		echo '<table class="form-table" role="presentation">';
 		echo '<tr><th><label for="name">' . esc_html__( 'Name', 'trade-dispatch' ) . '</label></th><td><input required class="regular-text" id="name" name="name" value="' . esc_attr( $edit ? (string) $edit['name'] : '' ) . '" /></td></tr>';
 		echo '<tr><th><label for="description">' . esc_html__( 'Description', 'trade-dispatch' ) . '</label></th><td><textarea class="large-text" rows="3" id="description" name="description">' . esc_textarea( $edit ? (string) $edit['description'] : '' ) . '</textarea></td></tr>';
-		echo '<tr><th><label for="default_minutes">' . esc_html__( 'Default minutes', 'trade-dispatch' ) . '</label></th><td><input id="default_minutes" name="default_minutes" value="' . esc_attr( $edit ? (string) $edit['default_minutes'] : '60' ) . '" /></td></tr>';
+		echo '<tr><th><label for="default_minutes">' . esc_html__( 'Default minutes', 'trade-dispatch' ) . '</label></th><td><input id="default_minutes" name="default_minutes" type="number" min="1" step="1" value="' . esc_attr( $edit ? (string) $edit['default_minutes'] : '60' ) . '" /></td></tr>';
 		echo '<tr><th><label for="default_amount">' . esc_html__( 'Default quote amount', 'trade-dispatch' ) . '</label></th><td><input id="default_amount" name="default_amount" value="' . esc_attr( $edit ? (string) $edit['default_amount'] : '0.00' ) . '" /></td></tr>';
 		echo '</table>';
 		submit_button( __( 'Save service', 'trade-dispatch' ) );

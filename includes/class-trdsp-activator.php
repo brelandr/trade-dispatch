@@ -83,6 +83,7 @@ class TRDSP_Activator {
 			postcode varchar(20) NOT NULL DEFAULT '',
 			gate_notes text NULL,
 			hazard_notes text NULL,
+			office_brief text NULL,
 			recurrence varchar(32) NOT NULL DEFAULT '',
 			created_at datetime NOT NULL,
 			updated_at datetime NOT NULL,

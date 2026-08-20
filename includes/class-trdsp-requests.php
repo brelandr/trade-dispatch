@@ -14,7 +14,15 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 class TRDSP_Requests {
 
-	const OPTION = 'trdsp_estimate_requests';
+	const OPTION          = 'trdsp_estimate_requests';
+	const COUNT_TRANSIENT = 'trdsp_requests_count';
+
+	/**
+	 * Request-count memo for the current PHP request.
+	 *
+	 * @var int|null
+	 */
+	protected static $count_memo = null;
 
 	/**
 	 * Optional note appended to the next customer email.
@@ -31,6 +39,15 @@ class TRDSP_Requests {
 			add_option( self::OPTION, array(), '', 'no' );
 		}
 		add_action( 'admin_post_trdsp_review_request', array( __CLASS__, 'handle_review' ) );
+		add_action( 'trdsp_after_job_save', array( __CLASS__, 'invalidate_count' ) );
+	}
+
+	/**
+	 * Drop the inbox count cache after a write.
+	 */
+	public static function invalidate_count() {
+		self::$count_memo = null;
+		delete_transient( self::COUNT_TRANSIENT );
 	}
 
 	/**
@@ -53,6 +70,7 @@ class TRDSP_Requests {
 			'message' => sanitize_textarea_field( (string) $message ),
 		);
 		update_option( self::OPTION, $all, false );
+		self::invalidate_count();
 	}
 
 	/**
@@ -71,6 +89,7 @@ class TRDSP_Requests {
 		}
 		unset( $all[ (string) $estimate_id ], $all[ $estimate_id ] );
 		update_option( self::OPTION, $all, false );
+		self::invalidate_count();
 	}
 
 	/**
@@ -188,7 +207,17 @@ class TRDSP_Requests {
 	 * @return int
 	 */
 	public static function count() {
-		return count( self::list_items() );
+		if ( null !== self::$count_memo ) {
+			return self::$count_memo;
+		}
+		$cached = get_transient( self::COUNT_TRANSIENT );
+		if ( false !== $cached && is_numeric( $cached ) ) {
+			self::$count_memo = (int) $cached;
+			return self::$count_memo;
+		}
+		self::$count_memo = count( self::list_items() );
+		set_transient( self::COUNT_TRANSIENT, self::$count_memo, MINUTE_IN_SECONDS );
+		return self::$count_memo;
 	}
 
 	/**
@@ -315,9 +344,12 @@ class TRDSP_Requests {
 	 * Approve or decline a request.
 	 */
 	public static function handle_review() {
+		if ( ! isset( $_POST['trdsp_review_request_nonce'] ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
 		$type = isset( $_POST['trdsp_request_type'] ) ? sanitize_key( wp_unslash( $_POST['trdsp_request_type'] ) ) : '';
 		$id   = isset( $_POST['trdsp_request_id'] ) ? absint( wp_unslash( $_POST['trdsp_request_id'] ) ) : 0;
-		if ( ! isset( $_POST['trdsp_review_request_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['trdsp_review_request_nonce'] ) ), 'trdsp_review_request_' . $type . '_' . $id ) ) {
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['trdsp_review_request_nonce'] ) ), 'trdsp_review_request_' . $type . '_' . $id ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
 		if ( 'estimate' === $type ) {
@@ -349,25 +381,128 @@ class TRDSP_Requests {
 	}
 
 	/**
+	 * Approve or decline without redirecting (companion REST).
+	 *
+	 * @param string $type     time|estimate|booking.
+	 * @param int    $id       Record ID.
+	 * @param string $decision approve|decline.
+	 * @param string $note     Optional office note for the customer email.
+	 * @return array<string,mixed>|\WP_Error
+	 */
+	public static function decide( $type, $id, $decision, $note = '' ) {
+		$type     = sanitize_key( $type );
+		$id       = absint( $id );
+		$decision = sanitize_key( $decision );
+		if ( ! in_array( $type, array( 'time', 'estimate', 'booking' ), true ) || $id < 1 || ! in_array( $decision, array( 'approve', 'decline' ), true ) ) {
+			return new WP_Error( 'trdsp_request_invalid', __( 'That request could not be reviewed.', 'trade-dispatch' ), array( 'status' => 400 ) );
+		}
+		if ( '' !== $note ) {
+			self::set_office_note( $note );
+		}
+		if ( 'approve' === $decision ) {
+			return self::decide_approve( $type, $id );
+		}
+		return self::decide_decline( $type, $id );
+	}
+
+	/**
 	 * Approve a pending item.
 	 *
 	 * @param string $type time|estimate|booking.
 	 * @param int    $id   Record ID.
 	 */
 	protected static function approve( $type, $id ) {
+		self::redirect_after_decide( $id, 'approve', self::decide( $type, $id, 'approve' ) );
+	}
+
+	/**
+	 * Decline a pending item.
+	 *
+	 * @param string $type time|estimate|booking.
+	 * @param int    $id   Record ID.
+	 */
+	protected static function decline( $type, $id ) {
+		self::redirect_after_decide( $id, 'decline', self::decide( $type, $id, 'decline' ) );
+	}
+
+	/**
+	 * Apply a portal preferred time.
+	 *
+	 * @param int $id Job ID.
+	 */
+	protected static function approve_time( $id ) {
+		self::redirect_after_decide( $id, 'approve', self::decide( 'time', $id, 'approve' ) );
+	}
+
+	/**
+	 * Confirm a booking request.
+	 *
+	 * @param int $id Job ID.
+	 */
+	protected static function approve_booking( $id ) {
+		self::redirect_after_decide( $id, 'approve', self::decide( 'booking', $id, 'approve' ) );
+	}
+
+	/**
+	 * Approve without redirect.
+	 *
+	 * @param string $type time|estimate|booking.
+	 * @param int    $id   Record ID.
+	 * @return array<string,mixed>|\WP_Error
+	 */
+	protected static function decide_approve( $type, $id ) {
 		if ( 'time' === $type ) {
-			self::approve_time( $id );
-			return;
+			$job       = class_exists( 'TRDSP_Jobs' ) ? TRDSP_Jobs::get( $id ) : null;
+			$preferred = $job ? TRDSP_Jobs::get_preferred_at( $id ) : '';
+			if ( ! $job || '' === $preferred ) {
+				self::clear_office_note();
+				return new WP_Error( 'trdsp_request_missing', __( 'That time request is no longer waiting.', 'trade-dispatch' ), array( 'status' => 404 ) );
+			}
+			$job['scheduled_at'] = $preferred;
+			$result              = TRDSP_Jobs::save( $job );
+			if ( is_wp_error( $result ) ) {
+				self::clear_office_note();
+				return $result;
+			}
+			TRDSP_Jobs::set_preferred_at( $id, '' );
+			do_action( 'trdsp_job_preferred_applied', $id, $job, $preferred );
+			self::clear_office_note();
+			return array(
+				'overlap' => TRDSP_Jobs::overlaps_for_assignee( (int) $job['assigned_user_id'], (string) $job['scheduled_at'], $id ),
+			);
 		}
 		if ( 'booking' === $type ) {
-			self::approve_booking( $id );
-			return;
+			$job = class_exists( 'TRDSP_Jobs' ) ? TRDSP_Jobs::get( $id ) : null;
+			if ( ! $job || 'requested' !== (string) $job['status'] ) {
+				self::clear_office_note();
+				return new WP_Error( 'trdsp_request_missing', __( 'That booking request is no longer waiting.', 'trade-dispatch' ), array( 'status' => 404 ) );
+			}
+			if ( empty( $job['scheduled_at'] ) ) {
+				$preferred = TRDSP_Jobs::get_preferred_at( $id );
+				if ( '' !== $preferred ) {
+					$job['scheduled_at'] = $preferred;
+				}
+			}
+			if ( empty( $job['scheduled_at'] ) ) {
+				self::clear_office_note();
+				return new WP_Error( 'trdsp_booking_need_time', __( 'Set a visit time before approving this booking.', 'trade-dispatch' ), array( 'status' => 400 ) );
+			}
+			$job['status'] = 'scheduled';
+			$result        = TRDSP_Jobs::save( $job );
+			if ( is_wp_error( $result ) ) {
+				self::clear_office_note();
+				return $result;
+			}
+			TRDSP_Jobs::set_preferred_at( $id, '' );
+			self::clear_office_note();
+			return array(
+				'overlap' => TRDSP_Jobs::overlaps_for_assignee( (int) $job['assigned_user_id'], (string) $job['scheduled_at'], $id ),
+			);
 		}
 		$estimate = class_exists( 'TRDSP_Estimates' ) ? TRDSP_Estimates::get( $id ) : null;
 		if ( ! $estimate ) {
 			self::clear_office_note();
-			wp_safe_redirect( esc_url_raw( self::inbox_url( 'error' ) ) );
-			exit;
+			return new WP_Error( 'trdsp_request_missing', __( 'That estimate request is no longer waiting.', 'trade-dispatch' ), array( 'status' => 404 ) );
 		}
 		self::clear_estimate_request( $id );
 		/**
@@ -378,24 +513,23 @@ class TRDSP_Requests {
 		 */
 		do_action( 'trdsp_estimate_request_approved', $id, $estimate );
 		self::clear_office_note();
-		wp_safe_redirect( esc_url_raw( self::inbox_url( 'request_approved' ) ) );
-		exit;
+		return array( 'overlap' => false );
 	}
 
 	/**
-	 * Decline a pending item.
+	 * Decline without redirect.
 	 *
 	 * @param string $type time|estimate|booking.
 	 * @param int    $id   Record ID.
+	 * @return array<string,mixed>|\WP_Error
 	 */
-	protected static function decline( $type, $id ) {
+	protected static function decide_decline( $type, $id ) {
 		if ( 'time' === $type ) {
 			$job       = class_exists( 'TRDSP_Jobs' ) ? TRDSP_Jobs::get( $id ) : null;
 			$preferred = $job ? TRDSP_Jobs::get_preferred_at( $id ) : '';
 			if ( ! $job || '' === $preferred ) {
 				self::clear_office_note();
-				wp_safe_redirect( esc_url_raw( self::inbox_url( 'error' ) ) );
-				exit;
+				return new WP_Error( 'trdsp_request_missing', __( 'That time request is no longer waiting.', 'trade-dispatch' ), array( 'status' => 404 ) );
 			}
 			TRDSP_Jobs::set_preferred_at( $id, '' );
 			/**
@@ -407,22 +541,19 @@ class TRDSP_Requests {
 			 */
 			do_action( 'trdsp_job_preferred_declined', $id, $job, $preferred );
 			self::clear_office_note();
-			wp_safe_redirect( esc_url_raw( self::inbox_url( 'request_declined' ) ) );
-			exit;
+			return array( 'overlap' => false );
 		}
 		if ( 'booking' === $type ) {
 			$job = class_exists( 'TRDSP_Jobs' ) ? TRDSP_Jobs::get( $id ) : null;
 			if ( ! $job || 'requested' !== (string) $job['status'] ) {
 				self::clear_office_note();
-				wp_safe_redirect( esc_url_raw( self::inbox_url( 'error' ) ) );
-				exit;
+				return new WP_Error( 'trdsp_request_missing', __( 'That booking request is no longer waiting.', 'trade-dispatch' ), array( 'status' => 404 ) );
 			}
 			$job['status'] = 'cancelled';
 			$result        = TRDSP_Jobs::save( $job );
 			if ( is_wp_error( $result ) ) {
 				self::clear_office_note();
-				wp_safe_redirect( esc_url_raw( self::inbox_url( 'error' ) ) );
-				exit;
+				return $result;
 			}
 			TRDSP_Jobs::set_preferred_at( $id, '' );
 			/**
@@ -433,14 +564,12 @@ class TRDSP_Requests {
 			 */
 			do_action( 'trdsp_job_booking_declined', $id, $job );
 			self::clear_office_note();
-			wp_safe_redirect( esc_url_raw( self::inbox_url( 'request_declined' ) ) );
-			exit;
+			return array( 'overlap' => false );
 		}
 		$estimate = class_exists( 'TRDSP_Estimates' ) ? TRDSP_Estimates::get( $id ) : null;
 		if ( ! $estimate ) {
 			self::clear_office_note();
-			wp_safe_redirect( esc_url_raw( self::inbox_url( 'error' ) ) );
-			exit;
+			return new WP_Error( 'trdsp_request_missing', __( 'That estimate request is no longer waiting.', 'trade-dispatch' ), array( 'status' => 404 ) );
 		}
 		self::clear_estimate_request( $id );
 		/**
@@ -451,93 +580,42 @@ class TRDSP_Requests {
 		 */
 		do_action( 'trdsp_estimate_request_declined', $id, $estimate );
 		self::clear_office_note();
-		wp_safe_redirect( esc_url_raw( self::inbox_url( 'request_declined' ) ) );
-		exit;
+		return array( 'overlap' => false );
 	}
 
 	/**
-	 * Apply a portal preferred time.
+	 * Admin redirect after a review.
 	 *
-	 * @param int $id Job ID.
+	 * @param int                       $id       Record ID.
+	 * @param string                    $decision approve|decline.
+	 * @param array<string,mixed>|\WP_Error $result Decide result.
 	 */
-	protected static function approve_time( $id ) {
-		$job       = class_exists( 'TRDSP_Jobs' ) ? TRDSP_Jobs::get( $id ) : null;
-		$preferred = $job ? TRDSP_Jobs::get_preferred_at( $id ) : '';
-		if ( ! $job || '' === $preferred ) {
-			self::clear_office_note();
-			wp_safe_redirect( esc_url_raw( self::inbox_url( 'error' ) ) );
-			exit;
-		}
-		$job['scheduled_at'] = $preferred;
-		$result              = TRDSP_Jobs::save( $job );
+	protected static function redirect_after_decide( $id, $decision, $result ) {
 		if ( is_wp_error( $result ) ) {
-			self::clear_office_note();
-			wp_safe_redirect( esc_url_raw( self::inbox_url( 'error' ) ) );
-			exit;
-		}
-		TRDSP_Jobs::set_preferred_at( $id, '' );
-		do_action( 'trdsp_job_preferred_applied', $id, $job, $preferred );
-		self::clear_office_note();
-		$args = array(
-			'page'         => 'trade-dispatch-requests',
-			'trdsp_notice' => 'request_approved',
-		);
-		if ( TRDSP_Jobs::overlaps_for_assignee( (int) $job['assigned_user_id'], (string) $job['scheduled_at'], $id ) ) {
-			$args['trdsp_overlap'] = '1';
-		}
-		wp_safe_redirect( esc_url_raw( add_query_arg( $args, admin_url( 'admin.php' ) ) ) );
-		exit;
-	}
-
-	/**
-	 * Confirm a booking request.
-	 *
-	 * @param int $id Job ID.
-	 */
-	protected static function approve_booking( $id ) {
-		$job = class_exists( 'TRDSP_Jobs' ) ? TRDSP_Jobs::get( $id ) : null;
-		if ( ! $job || 'requested' !== (string) $job['status'] ) {
-			self::clear_office_note();
-			wp_safe_redirect( esc_url_raw( self::inbox_url( 'error' ) ) );
-			exit;
-		}
-		if ( empty( $job['scheduled_at'] ) ) {
-			$preferred = TRDSP_Jobs::get_preferred_at( $id );
-			if ( '' !== $preferred ) {
-				$job['scheduled_at'] = $preferred;
-			}
-		}
-		if ( empty( $job['scheduled_at'] ) ) {
-			self::clear_office_note();
-			wp_safe_redirect(
-				esc_url_raw(
-					add_query_arg(
-						array(
-							'page'         => 'trade-dispatch',
-							'trdsp_view'   => 'edit',
-							'job_id'       => $id,
-							'trdsp_notice' => 'booking_need_time',
-						),
-						admin_url( 'admin.php' )
+			if ( 'trdsp_booking_need_time' === $result->get_error_code() ) {
+				wp_safe_redirect(
+					esc_url_raw(
+						add_query_arg(
+							array(
+								'page'         => 'trade-dispatch',
+								'trdsp_view'   => 'edit',
+								'job_id'       => $id,
+								'trdsp_notice' => 'booking_need_time',
+							),
+							admin_url( 'admin.php' )
+						)
 					)
-				)
-			);
-			exit;
-		}
-		$job['status'] = 'scheduled';
-		$result        = TRDSP_Jobs::save( $job );
-		if ( is_wp_error( $result ) ) {
-			self::clear_office_note();
+				);
+				exit;
+			}
 			wp_safe_redirect( esc_url_raw( self::inbox_url( 'error' ) ) );
 			exit;
 		}
-		TRDSP_Jobs::set_preferred_at( $id, '' );
-		self::clear_office_note();
 		$args = array(
 			'page'         => 'trade-dispatch-requests',
-			'trdsp_notice' => 'request_approved',
+			'trdsp_notice' => 'approve' === $decision ? 'request_approved' : 'request_declined',
 		);
-		if ( TRDSP_Jobs::overlaps_for_assignee( (int) $job['assigned_user_id'], (string) $job['scheduled_at'], $id ) ) {
+		if ( ! empty( $result['overlap'] ) ) {
 			$args['trdsp_overlap'] = '1';
 		}
 		wp_safe_redirect( esc_url_raw( add_query_arg( $args, admin_url( 'admin.php' ) ) ) );
@@ -605,7 +683,7 @@ class TRDSP_Requests {
 			submit_button( __( 'Approve', 'trade-dispatch' ), 'primary', 'trdsp_decision_approve', false );
 			echo ' ';
 			if ( 'booking' === $type ) {
-				echo '<button type="submit" name="trdsp_decision_decline" class="button" value="1" onclick="return confirm(\'' . esc_js( __( 'Decline this booking and mark the job cancelled?', 'trade-dispatch' ) ) . '\');">' . esc_html__( 'Decline and cancel', 'trade-dispatch' ) . '</button>';
+				echo '<button type="submit" name="trdsp_decision_decline" class="button" value="1" data-trdsp-confirm="' . esc_attr( __( 'Decline this booking and mark the job cancelled?', 'trade-dispatch' ) ) . '">' . esc_html__( 'Decline and cancel', 'trade-dispatch' ) . '</button>';
 			} else {
 				submit_button( __( 'Decline', 'trade-dispatch' ), 'secondary', 'trdsp_decision_decline', false );
 			}

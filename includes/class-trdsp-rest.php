@@ -10,19 +10,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
- * trade-dispatch/v1 portal endpoints.
+ * trade-dispatch/v1 portal endpoints (logged-in customer or office).
+ *
+ * Field-tech mobile routes live in Trade Dispatch Pro (`trade-dispatch-pro/v1`).
  */
 class TRDSP_REST {
 
 	/**
-	 * Register routes.
+	 * Hook rest_api_init.
+	 *
+	 * @return void
 	 */
 	public static function hooks() {
 		add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
 	}
 
 	/**
-	 * Register REST routes.
+	 * Register GET /portal/jobs and GET /portal/estimates.
+	 *
+	 * @return void
 	 */
 	public static function register_routes() {
 		register_rest_route(
@@ -46,12 +52,15 @@ class TRDSP_REST {
 	}
 
 	/**
-	 * Logged-in users may read their own portal jobs.
+	 * Cookie or Application Password session with portal or office capability.
 	 *
 	 * @return bool
 	 */
 	public static function portal_permission() {
-		return is_user_logged_in();
+		if ( ! is_user_logged_in() ) {
+			return false;
+		}
+		return current_user_can( 'trdsp_portal' ) || current_user_can( 'trdsp_access' );
 	}
 
 	/**

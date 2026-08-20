@@ -68,7 +68,9 @@ class TRDSP_Portal {
 	public static function render( $atts ) {
 		unset( $atts );
 		wp_enqueue_style( 'trdsp-public' );
-		wp_enqueue_script( 'trdsp-booking' );
+		if ( class_exists( 'TRDSP_Booking' ) ) {
+			TRDSP_Booking::enqueue_public_script();
+		}
 		if ( ! is_user_logged_in() ) {
 			$login = wp_login_url( get_permalink() ? (string) get_permalink() : home_url( '/' ) );
 			return '<div class="trdsp-portal"><p>' . esc_html__( 'Log in to view your scheduled visits and service history.', 'trade-dispatch' ) . '</p><p><a class="trdsp-submit" href="' . esc_url( $login ) . '">' . esc_html__( 'Log in', 'trade-dispatch' ) . '</a></p></div>';
@@ -174,10 +176,10 @@ class TRDSP_Portal {
 	 * Portal flash notice after a reschedule request.
 	 */
 	protected static function render_notice() {
-		if ( ! isset( $_GET['trdsp_portal'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Display flag only.
+		$flag = isset( $_GET['trdsp_portal'] ) ? sanitize_key( wp_unslash( $_GET['trdsp_portal'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Portal flash flag only.
+		if ( '' === $flag ) {
 			return;
 		}
-		$flag = sanitize_key( wp_unslash( $_GET['trdsp_portal'] ) );
 		if ( 'rescheduled' === $flag ) {
 			echo '<p class="trdsp-notice trdsp-notice-ok">' . esc_html__( 'Your reschedule request was sent to the office. They will confirm a new time.', 'trade-dispatch' ) . '</p>';
 		} elseif ( 'estimate_requested' === $flag ) {
@@ -344,11 +346,14 @@ class TRDSP_Portal {
 	 * Customer asked for a different visit time.
 	 */
 	public static function handle_reschedule() {
-		$id = isset( $_POST['job_id'] ) ? absint( wp_unslash( $_POST['job_id'] ) ) : 0;
-		if ( ! isset( $_POST['trdsp_portal_reschedule_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['trdsp_portal_reschedule_nonce'] ) ), 'trdsp_portal_reschedule_' . $id ) ) {
+		if ( ! isset( $_POST['trdsp_portal_reschedule_nonce'] ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
-		if ( ! is_user_logged_in() ) {
+		$id = isset( $_POST['job_id'] ) ? absint( wp_unslash( $_POST['job_id'] ) ) : 0;
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['trdsp_portal_reschedule_nonce'] ) ), 'trdsp_portal_reschedule_' . $id ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
+		if ( ! current_user_can( 'trdsp_portal' ) ) {
 			wp_die( esc_html__( 'Unauthorized.', 'trade-dispatch' ) );
 		}
 		$redirect = isset( $_POST['trdsp_redirect'] ) ? esc_url_raw( wp_unslash( $_POST['trdsp_redirect'] ) ) : home_url( '/' );
@@ -394,11 +399,14 @@ class TRDSP_Portal {
 	 * Customer asked the office to schedule a sent estimate.
 	 */
 	public static function handle_estimate_request() {
-		$id = isset( $_POST['estimate_id'] ) ? absint( wp_unslash( $_POST['estimate_id'] ) ) : 0;
-		if ( ! isset( $_POST['trdsp_portal_estimate_request_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['trdsp_portal_estimate_request_nonce'] ) ), 'trdsp_portal_estimate_request_' . $id ) ) {
+		if ( ! isset( $_POST['trdsp_portal_estimate_request_nonce'] ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
-		if ( ! is_user_logged_in() ) {
+		$id = isset( $_POST['estimate_id'] ) ? absint( wp_unslash( $_POST['estimate_id'] ) ) : 0;
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['trdsp_portal_estimate_request_nonce'] ) ), 'trdsp_portal_estimate_request_' . $id ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
+		if ( ! current_user_can( 'trdsp_portal' ) ) {
 			wp_die( esc_html__( 'Unauthorized.', 'trade-dispatch' ) );
 		}
 		$redirect = isset( $_POST['trdsp_redirect'] ) ? esc_url_raw( wp_unslash( $_POST['trdsp_redirect'] ) ) : home_url( '/' );
@@ -429,11 +437,14 @@ class TRDSP_Portal {
 	 * Customer accepted a sent estimate (not a payment).
 	 */
 	public static function handle_accept_estimate() {
-		$id = isset( $_POST['estimate_id'] ) ? absint( wp_unslash( $_POST['estimate_id'] ) ) : 0;
-		if ( ! isset( $_POST['trdsp_portal_accept_estimate_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['trdsp_portal_accept_estimate_nonce'] ) ), 'trdsp_portal_accept_estimate_' . $id ) ) {
+		if ( ! isset( $_POST['trdsp_portal_accept_estimate_nonce'] ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
-		if ( ! is_user_logged_in() ) {
+		$id = isset( $_POST['estimate_id'] ) ? absint( wp_unslash( $_POST['estimate_id'] ) ) : 0;
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['trdsp_portal_accept_estimate_nonce'] ) ), 'trdsp_portal_accept_estimate_' . $id ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
+		if ( ! current_user_can( 'trdsp_portal' ) ) {
 			wp_die( esc_html__( 'Unauthorized.', 'trade-dispatch' ) );
 		}
 		$redirect = isset( $_POST['trdsp_redirect'] ) ? esc_url_raw( wp_unslash( $_POST['trdsp_redirect'] ) ) : home_url( '/' );
@@ -478,11 +489,14 @@ class TRDSP_Portal {
 	 * Single-event calendar file for a visit the customer owns.
 	 */
 	public static function handle_ics() {
-		$id = isset( $_GET['job_id'] ) ? absint( wp_unslash( $_GET['job_id'] ) ) : 0;
-		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_portal_ics_' . $id ) ) {
+		if ( ! isset( $_GET['_wpnonce'] ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
-		if ( ! is_user_logged_in() ) {
+		$id = isset( $_GET['job_id'] ) ? absint( wp_unslash( $_GET['job_id'] ) ) : 0;
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_portal_ics_' . $id ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
+		if ( ! current_user_can( 'trdsp_portal' ) ) {
 			wp_die( esc_html__( 'Unauthorized.', 'trade-dispatch' ) );
 		}
 		$job      = TRDSP_Jobs::get( $id );

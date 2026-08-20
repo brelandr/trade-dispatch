@@ -58,10 +58,17 @@ class TRDSP_Privacy {
 	 * @return array<string,mixed>
 	 */
 	public static function export( $email, $page = 1 ) {
-		unset( $page );
+		$page     = max( 1, absint( $page ) );
+		$per      = 20;
 		$customer = TRDSP_Customers::get_by_email( $email );
 		$data     = array();
-		if ( $customer ) {
+		if ( ! $customer ) {
+			return array(
+				'data' => $data,
+				'done' => true,
+			);
+		}
+		if ( 1 === $page ) {
 			$data[] = array(
 				'group_id'    => 'trdsp-customer',
 				'group_label' => __( 'Trade Dispatch Customer', 'trade-dispatch' ),
@@ -85,82 +92,89 @@ class TRDSP_Privacy {
 					),
 				),
 			);
-			$jobs = TRDSP_Jobs::query(
-				array(
-					'customer_id' => (int) $customer['id'],
-					'limit'       => 100,
-				)
+		}
+		$jobs = TRDSP_Jobs::query(
+			array(
+				'customer_id' => (int) $customer['id'],
+				'limit'       => $per,
+				'offset'      => ( $page - 1 ) * $per,
+			)
+		);
+		foreach ( $jobs as $job ) {
+			$data[] = array(
+				'group_id'    => 'trdsp-jobs',
+				'group_label' => __( 'Trade Dispatch Jobs', 'trade-dispatch' ),
+				'item_id'     => 'job-' . (int) $job['id'],
+				'data'        => array(
+					array(
+						'name'  => __( 'Title', 'trade-dispatch' ),
+						'value' => (string) $job['title'],
+					),
+					array(
+						'name'  => __( 'Status', 'trade-dispatch' ),
+						'value' => (string) $job['status'],
+					),
+					array(
+						'name'  => __( 'Scheduled', 'trade-dispatch' ),
+						'value' => (string) $job['scheduled_at'],
+					),
+				),
 			);
-			foreach ( $jobs as $job ) {
+			$notes = TRDSP_Notes::for_job( (int) $job['id'] );
+			foreach ( $notes as $note ) {
 				$data[] = array(
-					'group_id'    => 'trdsp-jobs',
-					'group_label' => __( 'Trade Dispatch Jobs', 'trade-dispatch' ),
-					'item_id'     => 'job-' . (int) $job['id'],
+					'group_id'    => 'trdsp-notes',
+					'group_label' => __( 'Trade Dispatch Job Notes', 'trade-dispatch' ),
+					'item_id'     => 'note-' . (int) $note['id'],
 					'data'        => array(
 						array(
-							'name'  => __( 'Title', 'trade-dispatch' ),
+							'name'  => __( 'Job', 'trade-dispatch' ),
 							'value' => (string) $job['title'],
 						),
 						array(
-							'name'  => __( 'Status', 'trade-dispatch' ),
-							'value' => (string) $job['status'],
+							'name'  => __( 'Note', 'trade-dispatch' ),
+							'value' => (string) $note['note'],
 						),
 						array(
-							'name'  => __( 'Scheduled', 'trade-dispatch' ),
-							'value' => (string) $job['scheduled_at'],
+							'name'  => __( 'Created', 'trade-dispatch' ),
+							'value' => (string) $note['created_at'],
 						),
 					),
 				);
-				$notes = TRDSP_Notes::for_job( (int) $job['id'] );
-				foreach ( $notes as $note ) {
-					$data[] = array(
-						'group_id'    => 'trdsp-notes',
-						'group_label' => __( 'Trade Dispatch Job Notes', 'trade-dispatch' ),
-						'item_id'     => 'note-' . (int) $note['id'],
-						'data'        => array(
-							array(
-								'name'  => __( 'Job', 'trade-dispatch' ),
-								'value' => (string) $job['title'],
-							),
-							array(
-								'name'  => __( 'Note', 'trade-dispatch' ),
-								'value' => (string) $note['note'],
-							),
-							array(
-								'name'  => __( 'Created', 'trade-dispatch' ),
-								'value' => (string) $note['created_at'],
-							),
-						),
-					);
-				}
 			}
-			$estimates = TRDSP_Estimates::query(
-				array(
-					'customer_id' => (int) $customer['id'],
-					'limit'       => 100,
-				)
+		}
+		if ( count( $jobs ) === $per ) {
+			return array(
+				'data' => $data,
+				'done' => false,
 			);
-			foreach ( $estimates as $estimate ) {
-				$data[] = array(
-					'group_id'    => 'trdsp-estimates',
-					'group_label' => __( 'Trade Dispatch Estimates', 'trade-dispatch' ),
-					'item_id'     => 'estimate-' . (int) $estimate['id'],
-					'data'        => array(
-						array(
-							'name'  => __( 'Title', 'trade-dispatch' ),
-							'value' => (string) $estimate['title'],
-						),
-						array(
-							'name'  => __( 'Amount', 'trade-dispatch' ),
-							'value' => (string) $estimate['amount'],
-						),
-						array(
-							'name'  => __( 'Status', 'trade-dispatch' ),
-							'value' => (string) $estimate['status'],
-						),
+		}
+		$estimates = TRDSP_Estimates::query(
+			array(
+				'customer_id' => (int) $customer['id'],
+				'limit'       => 200,
+			)
+		);
+		foreach ( $estimates as $estimate ) {
+			$data[] = array(
+				'group_id'    => 'trdsp-estimates',
+				'group_label' => __( 'Trade Dispatch Estimates', 'trade-dispatch' ),
+				'item_id'     => 'estimate-' . (int) $estimate['id'],
+				'data'        => array(
+					array(
+						'name'  => __( 'Title', 'trade-dispatch' ),
+						'value' => (string) $estimate['title'],
 					),
-				);
-			}
+					array(
+						'name'  => __( 'Amount', 'trade-dispatch' ),
+						'value' => (string) $estimate['amount'],
+					),
+					array(
+						'name'  => __( 'Status', 'trade-dispatch' ),
+						'value' => (string) $estimate['status'],
+					),
+				),
+			);
 		}
 		return array(
 			'data' => $data,
@@ -180,27 +194,32 @@ class TRDSP_Privacy {
 		$customer = TRDSP_Customers::get_by_email( $email );
 		$removed  = 0;
 		$retained = false;
+		$done     = true;
 		if ( $customer ) {
 			$jobs = TRDSP_Jobs::query(
 				array(
 					'customer_id' => (int) $customer['id'],
-					'limit'       => 200,
+					'limit'       => 50,
 				)
 			);
 			foreach ( $jobs as $job ) {
 				TRDSP_Jobs::delete( (int) $job['id'] );
 				++$removed;
 			}
-			TRDSP_Estimates::delete_for_customer( (int) $customer['id'] );
-			++$removed;
-			TRDSP_Customers::delete( (int) $customer['id'] );
-			++$removed;
+			if ( count( $jobs ) === 50 ) {
+				$done = false;
+			} else {
+				TRDSP_Estimates::delete_for_customer( (int) $customer['id'] );
+				++$removed;
+				TRDSP_Customers::delete( (int) $customer['id'] );
+				++$removed;
+			}
 		}
 		return array(
 			'items_removed'  => $removed > 0,
 			'items_retained' => $retained,
 			'messages'       => array(),
-			'done'           => true,
+			'done'           => $done,
 		);
 	}
 }

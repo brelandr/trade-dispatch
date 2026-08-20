@@ -13,6 +13,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 
 $trdsp_settings = get_option( 'trdsp_settings', array() );
 if ( empty( $trdsp_settings['delete_data_on_uninstall'] ) ) {
+	// Keep tables, options, email templates, and roles unless the site owner opted in.
 	return;
 }
 
@@ -27,8 +28,8 @@ $trdsp_tables = array(
 );
 
 foreach ( $trdsp_tables as $trdsp_table ) {
-	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Uninstall DROP; table from trusted prefix + fixed slug.
-	$wpdb->query( "DROP TABLE IF EXISTS `{$trdsp_table}`" );
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange -- Uninstall DROP; table via %i.
+	$wpdb->query( $wpdb->prepare( 'DROP TABLE IF EXISTS %i', $trdsp_table ) );
 }
 
 delete_option( 'trdsp_settings' );
@@ -36,6 +37,7 @@ delete_option( 'trdsp_db_version' );
 delete_option( 'trdsp_preferred_times' );
 delete_option( 'trdsp_estimate_requests' );
 delete_option( 'trdsp_email_templates' );
+delete_transient( 'trdsp_requests_count' );
 delete_option( 'trdsp_roles_version' );
 wp_clear_scheduled_hook( 'trdsp_cron_recurring_jobs' );
 

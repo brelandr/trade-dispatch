@@ -189,7 +189,7 @@ class TRDSP_Email_Templates {
 	 * @return array{subject:string,body:string}
 	 */
 	public static function default_for( $key ) {
-		$job_block = "{intro}\n\n" . __( 'Job', 'trade-dispatch' ) . ": {job_title}\n" . __( 'Status', 'trade-dispatch' ) . ": {status}\n" . __( 'Scheduled', 'trade-dispatch' ) . ": {scheduled}\n" . __( 'Address', 'trade-dispatch' ) . ": {address}\n" . __( 'Customer', 'trade-dispatch' ) . ": {customer_name}\n{office_note}\n{portal_line}\n{photos_line}\n{invoice_line}\n{time_line}\n\n{company_name}";
+		$job_block = "{intro}\n\n" . __( 'Job', 'trade-dispatch' ) . ": {job_title}\n" . __( 'Status', 'trade-dispatch' ) . ": {status}\n" . __( 'Scheduled', 'trade-dispatch' ) . ": {scheduled}\n" . __( 'Address', 'trade-dispatch' ) . ": {address}\n" . __( 'Customer', 'trade-dispatch' ) . ": {customer_name}\n{office_note}\n{portal_line}\n{photos_line}\n{invoice_line}\n{time_line}\n{quotes_line}\n{parts_line}\n{checklist_line}\n{here_line}\n\n{company_name}";
 		$est_block = "{intro}\n\n" . __( 'Estimate', 'trade-dispatch' ) . ": {estimate_title}\n" . __( 'Amount', 'trade-dispatch' ) . ": {amount}\n" . __( 'Customer', 'trade-dispatch' ) . ": {customer_name}\n{office_note}\n{portal_line}\n\n{company_name}";
 		$map       = array(
 			'booked_customer'                    => array(
@@ -202,7 +202,7 @@ class TRDSP_Email_Templates {
 			),
 			'confirmed_customer'                 => array(
 				'subject' => __( 'Visit confirmed: {job_title}', 'trade-dispatch' ),
-				'body'    => str_replace( '{intro}', __( 'Your visit is confirmed. See you then.', 'trade-dispatch' ), $job_block ),
+				'body'    => str_replace( '{intro}', __( 'Your visit is confirmed. See you then. If this is your first visit, check your email for a customer portal login.', 'trade-dispatch' ), $job_block ),
 			),
 			'confirmed_office'                   => array(
 				'subject' => __( 'Visit confirmed: {job_title}', 'trade-dispatch' ),
@@ -286,11 +286,11 @@ class TRDSP_Email_Templates {
 			),
 			'assigned_crew'                      => array(
 				'subject' => __( 'Job assigned: {job_title}', 'trade-dispatch' ),
-				'body'    => str_replace( '{intro}', __( 'A job was assigned to you in Trade Dispatch.', 'trade-dispatch' ), $job_block ),
+				'body'    => str_replace( '{intro}', __( 'A job was assigned to you in Trade Dispatch.', 'trade-dispatch' ), str_replace( '{quotes_line}', "{quotes_line}\n{office_brief}", $job_block ) ),
 			),
 			'assigned_office'                    => array(
 				'subject' => __( 'Job assigned: {job_title}', 'trade-dispatch' ),
-				'body'    => str_replace( '{intro}', __( 'A job was assigned to you in Trade Dispatch.', 'trade-dispatch' ), $job_block ),
+				'body'    => str_replace( '{intro}', __( 'A job was assigned to you in Trade Dispatch.', 'trade-dispatch' ), str_replace( '{quotes_line}', "{quotes_line}\n{office_brief}", $job_block ) ),
 			),
 			'crew_tomorrow_digest'               => array(
 				'subject' => __( 'Tomorrow\'s jobs — {digest_date}', 'trade-dispatch' ),
@@ -372,13 +372,13 @@ class TRDSP_Email_Templates {
 	public static function sample_vars() {
 		$portal = class_exists( 'TRDSP_Portal' ) ? TRDSP_Portal::url_if_set() : '';
 		return array(
-			'customer_name'  => 'Jane Example',
+			'customer_name'  => __( 'Jane Example', 'trade-dispatch' ),
 			'job_title'      => __( 'Sample job', 'trade-dispatch' ),
 			'estimate_title' => __( 'Sample estimate', 'trade-dispatch' ),
 			'amount'         => number_format_i18n( 150, 2 ),
 			'scheduled'      => wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ) ),
 			'preferred_time' => wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ) ),
-			'address'        => '123 Main St, Example, TX 75001',
+			'address'        => __( '123 Main St, Example, TX 75001', 'trade-dispatch' ),
 			'status'         => __( 'Scheduled', 'trade-dispatch' ),
 			'company_name'   => class_exists( 'TRDSP_Mail' ) ? TRDSP_Mail::company_name() : (string) get_bloginfo( 'name' ),
 			'portal_url'     => $portal,
@@ -386,11 +386,16 @@ class TRDSP_Email_Templates {
 			'office_note'       => __( 'Sample office note.', 'trade-dispatch' ),
 			'customer_message'  => __( 'Sample note from the customer.', 'trade-dispatch' ),
 			'crew_name'      => __( 'Alex Crew', 'trade-dispatch' ),
-			'job_list'       => '• ' . __( 'Sample job', 'trade-dispatch' ) . ' — 9:00 AM',
+			'job_list'       => '• ' . __( 'Sample job — 9:00 AM', 'trade-dispatch' ),
 			'digest_date'    => wp_date( get_option( 'date_format' ), strtotime( '+1 day' ) ),
 			'photos_line'    => __( 'Visit photos are in the customer portal.', 'trade-dispatch' ),
 			'invoice_line'   => __( 'An invoice is in your portal.', 'trade-dispatch' ),
 			'time_line'      => __( 'Time on site: 45 minutes', 'trade-dispatch' ),
+			'quotes_line'    => __( '1 field quote is on this job.', 'trade-dispatch' ),
+			'parts_line'     => __( '3 parts used on this job.', 'trade-dispatch' ),
+			'checklist_line' => __( 'Checklist: 2/5', 'trade-dispatch' ),
+			'here_line'      => __( 'On the way 8:15 AM', 'trade-dispatch' ),
+			'office_brief'   => __( 'Bring extra fittings. Customer prefers afternoon.', 'trade-dispatch' ),
 		);
 	}
 
@@ -414,8 +419,11 @@ class TRDSP_Email_Templates {
 	 * Send a test copy of one template to the current user.
 	 */
 	public static function handle_test() {
+		if ( ! isset( $_GET['_wpnonce'] ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
 		$key = isset( $_GET['trdsp_template'] ) ? sanitize_key( wp_unslash( $_GET['trdsp_template'] ) ) : '';
-		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_test_email_template_' . $key ) ) {
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_test_email_template_' . $key ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
 		if ( ! class_exists( 'TRDSP_Roles' ) || ! TRDSP_Roles::can_manage_settings() ) {
@@ -441,8 +449,11 @@ class TRDSP_Email_Templates {
 	 * Clear a saved template so the default is used again.
 	 */
 	public static function handle_restore() {
+		if ( ! isset( $_GET['_wpnonce'] ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
+		}
 		$key = isset( $_GET['trdsp_template'] ) ? sanitize_key( wp_unslash( $_GET['trdsp_template'] ) ) : '';
-		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_restore_email_template_' . $key ) ) {
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'trdsp_restore_email_template_' . $key ) ) {
 			wp_die( esc_html__( 'Security check failed.', 'trade-dispatch' ) );
 		}
 		if ( ! class_exists( 'TRDSP_Roles' ) || ! TRDSP_Roles::can_manage_settings() ) {
@@ -477,7 +488,7 @@ class TRDSP_Email_Templates {
 		);
 		echo '<div class="wrap trdsp-wrap">';
 		echo '<h1>' . esc_html__( 'Emails', 'trade-dispatch' ) . '</h1>';
-		echo '<p class="description">' . esc_html__( 'Plain-text WordPress mail. Leave a field blank to use the default. Placeholders: {customer_name} {job_title} {estimate_title} {amount} {scheduled} {preferred_time} {address} {status} {company_name} {portal_url} {portal_line} {photos_line} {invoice_line} {time_line} {office_note} {customer_message} {crew_name} {job_list} {digest_date}', 'trade-dispatch' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'Plain-text WordPress mail. Leave a field blank to use the default. Placeholders: {customer_name} {job_title} {estimate_title} {amount} {scheduled} {preferred_time} {address} {status} {company_name} {portal_url} {portal_line} {photos_line} {invoice_line} {time_line} {quotes_line} {parts_line} {checklist_line} {here_line} {office_brief} {office_note} {customer_message} {crew_name} {job_list} {digest_date}', 'trade-dispatch' ) . '</p>';
 		echo '<form method="post" action="options.php">';
 		settings_fields( 'trdsp_email_templates_group' );
 		foreach ( $groups as $group => $heading ) {
@@ -519,7 +530,7 @@ class TRDSP_Email_Templates {
 				echo '<p>';
 				echo '<a class="button" href="' . esc_url( $test ) . '">' . esc_html__( 'Send test to me', 'trade-dispatch' ) . '</a> ';
 				if ( '' !== $subject || '' !== $body ) {
-					echo '<a class="button" href="' . esc_url( $restore ) . '" onclick="return confirm(\'' . esc_js( __( 'Clear this template and use the default again?', 'trade-dispatch' ) ) . '\');">' . esc_html__( 'Restore default', 'trade-dispatch' ) . '</a>';
+					echo '<a class="button" href="' . esc_url( $restore ) . '" data-trdsp-confirm="' . esc_attr( __( 'Clear this template and use the default again?', 'trade-dispatch' ) ) . '">' . esc_html__( 'Restore default', 'trade-dispatch' ) . '</a>';
 				}
 				echo '</p>';
 			}

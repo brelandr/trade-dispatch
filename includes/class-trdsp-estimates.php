@@ -54,7 +54,7 @@ class TRDSP_Estimates {
 		$table = self::table();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table lookup.
 		$row = $wpdb->get_row(
-			$wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table from prefix + fixed slug.
+			$wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $table, $id ),
 			ARRAY_A
 		);
 		return is_array( $row ) ? $row : null;
@@ -98,11 +98,19 @@ class TRDSP_Estimates {
 		}
 		$limit    = min( 200, max( 1, absint( $args['limit'] ) ) );
 		$offset   = max( 0, absint( $args['offset'] ) );
-		$sql      = 'SELECT * FROM ' . $table . ' WHERE ' . implode( ' AND ', $where ) . ' ORDER BY id DESC LIMIT %d OFFSET %d';
 		$params[] = $limit;
 		$params[] = $offset;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Dynamic WHERE with prepare.
-		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A );
+		array_unshift( $params, $table );
+		// WHERE fragments are fixed placeholder strings; values are bound by prepare().
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT * FROM %i WHERE ' . implode( ' AND ', $where ) . ' ORDER BY id DESC LIMIT %d OFFSET %d',
+				...$params
+			),
+			ARRAY_A
+		);
+		// phpcs:enable
 		return is_array( $rows ) ? $rows : array();
 	}
 

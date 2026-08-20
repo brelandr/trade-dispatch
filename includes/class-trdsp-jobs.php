@@ -68,7 +68,7 @@ class TRDSP_Jobs {
 		$table = self::table();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table lookup.
 		$row = $wpdb->get_row(
-			$wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table from prefix + fixed slug.
+			$wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $table, $id ),
 			ARRAY_A
 		);
 		return is_array( $row ) ? $row : null;
@@ -135,11 +135,19 @@ class TRDSP_Jobs {
 		}
 		$limit  = min( 200, max( 1, absint( $args['limit'] ) ) );
 		$offset = max( 0, absint( $args['offset'] ) );
-		$sql    = 'SELECT * FROM ' . $table . ' WHERE ' . implode( ' AND ', $where ) . ' ORDER BY scheduled_at ASC, id DESC LIMIT %d OFFSET %d';
 		$params[] = $limit;
 		$params[] = $offset;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Dynamic WHERE with prepare.
-		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A );
+		array_unshift( $params, $table );
+		// WHERE fragments are fixed placeholder strings; values are bound by prepare().
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber, PluginCheck.Security.DirectDB.UnescapedDBParameter
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT * FROM %i WHERE ' . implode( ' AND ', $where ) . ' ORDER BY scheduled_at ASC, id DESC LIMIT %d OFFSET %d',
+				...$params
+			),
+			ARRAY_A
+		);
+		// phpcs:enable
 		return is_array( $rows ) ? $rows : array();
 	}
 
@@ -220,6 +228,7 @@ class TRDSP_Jobs {
 			'postcode'         => sanitize_text_field( (string) ( $data['postcode'] ?? '' ) ),
 			'gate_notes'       => sanitize_textarea_field( (string) ( $data['gate_notes'] ?? '' ) ),
 			'hazard_notes'     => sanitize_textarea_field( (string) ( $data['hazard_notes'] ?? '' ) ),
+			'office_brief'     => sanitize_textarea_field( (string) ( $data['office_brief'] ?? '' ) ),
 			'recurrence'       => $recurrence,
 			'updated_at'       => $now,
 		);
@@ -253,7 +262,7 @@ class TRDSP_Jobs {
 				self::table(),
 				$row,
 				array( 'id' => $id ),
-				array( '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ),
+				array( '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ),
 				array( '%d' )
 			);
 			if ( false === $updated ) {
@@ -265,7 +274,7 @@ class TRDSP_Jobs {
 			$inserted = $wpdb->insert(
 				self::table(),
 				$row,
-				array( '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
+				array( '%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
 			);
 			if ( false === $inserted ) {
 				return new WP_Error( 'trdsp_job_insert', __( 'Could not create job.', 'trade-dispatch' ) );
@@ -337,6 +346,29 @@ class TRDSP_Jobs {
 	}
 
 	/**
+	 * Delete every job (and notes) for a customer.
+	 *
+	 * @param int $customer_id Customer ID.
+	 */
+	public static function delete_for_customer( $customer_id ) {
+		$customer_id = absint( $customer_id );
+		if ( $customer_id < 1 ) {
+			return;
+		}
+		do {
+			$jobs = self::query(
+				array(
+					'customer_id' => $customer_id,
+					'limit'       => 100,
+				)
+			);
+			foreach ( $jobs as $job ) {
+				self::delete( (int) $job['id'] );
+			}
+		} while ( ! empty( $jobs ) );
+	}
+
+	/**
 	 * Normalize a datetime string to Y-m-d H:i:s or empty.
 	 *
 	 * @param string $value Raw datetime.
@@ -392,7 +424,8 @@ class TRDSP_Jobs {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Duplicate check.
 		$found = $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT id FROM {$table} WHERE customer_id = %d AND title = %s AND scheduled_at = %s LIMIT 1", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table from prefix + fixed slug.
+				'SELECT id FROM %i WHERE customer_id = %d AND title = %s AND scheduled_at = %s LIMIT 1',
+				$table,
 				absint( $customer_id ),
 				$title,
 				$scheduled_at
@@ -563,6 +596,9 @@ class TRDSP_Jobs {
 			$all[ $key ] = $value;
 		}
 		update_option( self::preferred_option_key(), $all, false );
+		if ( class_exists( 'TRDSP_Requests' ) ) {
+			TRDSP_Requests::invalidate_count();
+		}
 	}
 
 	/**

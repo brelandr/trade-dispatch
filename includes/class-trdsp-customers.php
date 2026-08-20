@@ -39,7 +39,7 @@ class TRDSP_Customers {
 		$table = self::table();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table lookup.
 		$row = $wpdb->get_row(
-			$wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", $id ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table from prefix + fixed slug.
+			$wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $table, $id ),
 			ARRAY_A
 		);
 		return is_array( $row ) ? $row : null;
@@ -60,7 +60,7 @@ class TRDSP_Customers {
 		$table = self::table();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Custom table lookup.
 		$row = $wpdb->get_row(
-			$wpdb->prepare( "SELECT * FROM {$table} WHERE email = %s ORDER BY id ASC LIMIT 1", $email ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table from prefix + fixed slug.
+			$wpdb->prepare( 'SELECT * FROM %i WHERE email = %s ORDER BY id ASC LIMIT 1', $table, $email ),
 			ARRAY_A
 		);
 		return is_array( $row ) ? $row : null;
@@ -87,19 +87,33 @@ class TRDSP_Customers {
 		$offset = max( 0, absint( $args['offset'] ) );
 		$search = sanitize_text_field( (string) $args['search'] );
 
-		$sql = "SELECT * FROM {$table}";
-		$params = array();
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		if ( '' !== $search ) {
-			$like   = '%' . $wpdb->esc_like( $search ) . '%';
-			$sql   .= ' WHERE name LIKE %s OR email LIKE %s OR phone LIKE %s';
-			$params = array( $like, $like, $like );
+			$like = '%' . $wpdb->esc_like( $search ) . '%';
+			$rows = $wpdb->get_results(
+				$wpdb->prepare(
+					'SELECT * FROM %i WHERE name LIKE %s OR email LIKE %s OR phone LIKE %s ORDER BY name ASC, id DESC LIMIT %d OFFSET %d',
+					$table,
+					$like,
+					$like,
+					$like,
+					$limit,
+					$offset
+				),
+				ARRAY_A
+			);
+		} else {
+			$rows = $wpdb->get_results(
+				$wpdb->prepare(
+					'SELECT * FROM %i ORDER BY name ASC, id DESC LIMIT %d OFFSET %d',
+					$table,
+					$limit,
+					$offset
+				),
+				ARRAY_A
+			);
 		}
-		$sql .= ' ORDER BY name ASC, id DESC LIMIT %d OFFSET %d';
-		$params[] = $limit;
-		$params[] = $offset;
-
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Prepared below; table name is prefixed slug.
-		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $params ), ARRAY_A );
+		// phpcs:enable
 		return is_array( $rows ) ? $rows : array();
 	}
 
@@ -114,14 +128,15 @@ class TRDSP_Customers {
 		$table  = self::table();
 		$search = sanitize_text_field( $search );
 		if ( '' === $search ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Count; table from prefix + fixed slug.
-			return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Count; table via %i.
+			return (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i', $table ) );
 		}
 		$like = '%' . $wpdb->esc_like( $search ) . '%';
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Count with search.
 		return (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$table} WHERE name LIKE %s OR email LIKE %s OR phone LIKE %s", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Table from prefix + fixed slug.
+				'SELECT COUNT(*) FROM %i WHERE name LIKE %s OR email LIKE %s OR phone LIKE %s',
+				$table,
 				$like,
 				$like,
 				$like

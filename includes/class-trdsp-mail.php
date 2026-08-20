@@ -183,7 +183,9 @@ class TRDSP_Mail {
 			return;
 		}
 		$body = self::job_body( __( 'A job was assigned to you in Trade Dispatch.', 'trade-dispatch' ), $job, $customer );
+		/* translators: %s: Job title. */
 		wp_mail( $user->user_email, sprintf( __( 'Job assigned: %s', 'trade-dispatch' ), (string) ( $job['title'] ?? '' ) ), $body );
+		/* translators: %s: Job title. */
 		self::send_to_office( sprintf( __( 'Job assigned: %s', 'trade-dispatch' ), (string) ( $job['title'] ?? '' ) ), $body );
 	}
 
@@ -260,6 +262,7 @@ class TRDSP_Mail {
 			return;
 		}
 		self::send_to_office(
+			/* translators: %s: Job title. */
 			sprintf( __( 'Reschedule requested: %s', 'trade-dispatch' ), (string) ( $job['title'] ?? '' ) ),
 			self::job_body( __( 'A customer requested a new visit time from the portal.', 'trade-dispatch' ), $job, $customer )
 		);
@@ -283,6 +286,7 @@ class TRDSP_Mail {
 			return;
 		}
 		self::send_to_office(
+			/* translators: %s: Estimate title. */
 			sprintf( __( 'Customer wants to schedule: %s', 'trade-dispatch' ), (string) ( $estimate['title'] ?? '' ) ),
 			self::job_body( __( 'A customer asked to schedule this estimate from the portal. This is not a payment.', 'trade-dispatch' ), array( 'title' => (string) ( $estimate['title'] ?? '' ) ), $customer )
 		);
@@ -304,6 +308,7 @@ class TRDSP_Mail {
 			return;
 		}
 		self::send_to_office(
+			/* translators: %s: Estimate title. */
 			sprintf( __( 'Estimate accepted: %s', 'trade-dispatch' ), (string) ( $estimate['title'] ?? '' ) ),
 			self::job_body( __( 'A customer accepted this estimate from the portal. This is not a payment.', 'trade-dispatch' ), array( 'title' => (string) ( $estimate['title'] ?? '' ) ), $customer )
 		);
@@ -346,12 +351,17 @@ class TRDSP_Mail {
 			'photos_line'      => '',
 			'invoice_line'     => '',
 			'time_line'        => '',
+			'quotes_line'      => '',
+			'parts_line'       => '',
+			'checklist_line'   => '',
+			'here_line'        => '',
+			'office_brief'     => trim( (string) ( $job['office_brief'] ?? '' ) ),
 		);
 		foreach ( $extra as $key => $value ) {
 			$vars[ sanitize_key( (string) $key ) ] = (string) $value;
 		}
 		/**
-		 * Job email placeholders. Add-ons may set photos_line, invoice_line, and time_line.
+		 * Job email placeholders. Add-ons may set photos_line, invoice_line, time_line, quotes_line, parts_line, checklist_line, and here_line. office_brief is the crew dispatch note.
 		 *
 		 * @param array<string,string>     $vars     Placeholders.
 		 * @param array<string,mixed>      $job      Job row.
@@ -511,8 +521,12 @@ class TRDSP_Mail {
 				if ( '' !== $addr ) {
 					$block[] = $addr;
 				}
+				$brief = trim( (string) ( $job['office_brief'] ?? '' ) );
+				if ( '' !== $brief ) {
+					$block[] = $brief;
+				}
 				/**
-				 * Extra lines on a crew tomorrow-digest job (checklist, photos, parts).
+				 * Extra lines on a crew tomorrow-digest job (checklist, photos, parts used, on site).
 				 *
 				 * @param array<int,string>       $block Job lines.
 				 * @param array<string,mixed>     $job   Job row.

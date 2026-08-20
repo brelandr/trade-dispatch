@@ -6,7 +6,7 @@
  *
  * Plugin Name: Trade Dispatch
  * Description: Field service management for small trades: customers, jobs, scheduling, and a client portal on your own WordPress site.
- * Version: 0.3.37
+ * Version: 0.3.53
  * Author: Land Tech Web Designs, Corp
  * Author URI: https://landtechwebdesigns.com
  * Plugin URI: https://tradedispatch.app
@@ -23,10 +23,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 if ( ! defined( 'TRDSP_VERSION' ) ) {
-	define( 'TRDSP_VERSION', '0.3.37' );
+	define( 'TRDSP_VERSION', '0.3.53' );
 }
 if ( ! defined( 'TRDSP_DB_VERSION' ) ) {
-	define( 'TRDSP_DB_VERSION', '3' );
+	define( 'TRDSP_DB_VERSION', '4' );
 }
 if ( ! defined( 'TRDSP_PLUGIN_FILE' ) ) {
 	define( 'TRDSP_PLUGIN_FILE', __FILE__ );
