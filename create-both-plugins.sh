@@ -88,6 +88,7 @@ RSYNC_EXCLUDES=(
 	--exclude='*.zip'
 	--exclude='*.sh'
 	--exclude='*.md'
+	--exclude='*.py'
 	--exclude='*.map'
 	--exclude='composer.json'
 	--exclude='composer.lock'

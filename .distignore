@@ -46,6 +46,7 @@ tests
 docs
 README.md
 *.md
+*.py
 
 # Archives, maps, and secrets
 *.zip

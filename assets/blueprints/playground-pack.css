@@ -1,0 +1,330 @@
+/* Playground pack chrome — fullscreen-cover, edge-to-edge. Not enqueued on real shops. */
+
+:root {
+	--trdsp-pack-bg: #1d2327;
+	--trdsp-pack-text: #f0f0f1;
+	--trdsp-pack-accent: #2e8b57;
+	--trdsp-pack-muted: #8c8f94;
+}
+
+html,
+body.trdsp-playground-pack {
+	margin: 0;
+	background: var(--trdsp-pack-bg);
+	color: var(--trdsp-pack-text);
+}
+
+body.trdsp-playground-pack.admin-bar {
+	margin-top: 0 !important;
+}
+
+body.trdsp-playground-pack.home #wpadminbar {
+	display: none;
+}
+
+body.trdsp-playground-pack {
+	--trdsp-bg: var(--trdsp-pack-bg);
+	--trdsp-text: var(--trdsp-pack-text);
+	--trdsp-accent: var(--trdsp-pack-accent);
+	--trdsp-muted: var(--trdsp-pack-muted);
+	--trdsp-radius: 0;
+	--trdsp-font: "Arial Narrow", "Helvetica Neue", Helvetica, Arial, sans-serif;
+	--trdsp-display: var(--trdsp-font);
+	font-family: var(--trdsp-font);
+	letter-spacing: 0.01em;
+}
+
+body.trdsp-playground-pack .trdsp-theme-shell {
+	min-height: 100vh;
+	min-height: 100dvh;
+	background: var(--trdsp-bg);
+}
+
+body.trdsp-playground-pack .trdsp-theme-header {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	z-index: 20;
+	padding: 1.1rem 8vw;
+	background: linear-gradient(180deg, rgba(0, 0, 0, 0.5), transparent 85%);
+	color: #fff;
+}
+
+body.trdsp-playground-pack .trdsp-theme-header .inner,
+body.trdsp-playground-pack .trdsp-theme-footer .inner {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	width: 100%;
+	max-width: none;
+	margin: 0;
+	gap: 1rem;
+}
+
+body.trdsp-playground-pack .trdsp-theme-brand {
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	font-size: 1.05rem;
+	color: #fff;
+	text-decoration: none;
+	text-transform: uppercase;
+}
+
+body.trdsp-playground-pack .trdsp-theme-header nav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 1.15rem;
+}
+
+body.trdsp-playground-pack .trdsp-theme-header a,
+body.trdsp-playground-pack .trdsp-theme-footer a {
+	color: #fff;
+	text-decoration: none;
+	font-weight: 650;
+}
+
+body.trdsp-playground-pack .trdsp-theme-header a:hover,
+body.trdsp-playground-pack .trdsp-theme-footer a:hover {
+	color: #fff;
+	text-decoration: underline;
+}
+
+body.trdsp-playground-pack .trdsp-theme-main {
+	padding: 0;
+	max-width: none;
+}
+
+body.trdsp-playground-pack .trdsp-theme-hero {
+	position: relative;
+	width: 100vw;
+	max-width: 100vw;
+	margin: 0;
+	min-height: 100vh;
+	min-height: 100dvh;
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: column;
+	justify-content: flex-end;
+	padding: 7rem 8vw 4.5rem;
+	color: #fff;
+	background:
+		linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.72)),
+		linear-gradient(130deg, var(--trdsp-accent), #0f1416);
+}
+
+body.trdsp-playground-pack .trdsp-theme-hero::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	background: linear-gradient(135deg, color-mix(in srgb, var(--trdsp-accent) 28%, transparent), transparent 60%);
+}
+
+body.trdsp-playground-pack .trdsp-theme-hero-copy {
+	position: relative;
+	z-index: 1;
+	max-width: 46rem;
+}
+
+body.trdsp-playground-pack .trdsp-theme-hero h1 {
+	font-family: var(--trdsp-display);
+	font-size: clamp(2.8rem, 8vw, 5.4rem);
+	line-height: 0.92;
+	max-width: 14ch;
+	margin: 0 0 0.75rem;
+	letter-spacing: -0.02em;
+}
+
+body.trdsp-playground-pack .trdsp-theme-hero p {
+	font-size: clamp(1.05rem, 2vw, 1.35rem);
+	max-width: 34rem;
+	margin: 0 0 1.5rem;
+	color: rgba(255, 255, 255, 0.88);
+}
+
+body.trdsp-playground-pack .wp-block-buttons {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+}
+
+body.trdsp-playground-pack .wp-block-button__link {
+	display: inline-block;
+	padding: 0.8rem 1.25rem;
+	background: var(--trdsp-accent);
+	color: #fff;
+	text-decoration: none;
+	font-weight: 700;
+	border: 2px solid var(--trdsp-accent);
+	border-radius: 0;
+}
+
+body.trdsp-playground-pack .wp-block-button.is-style-outline .wp-block-button__link {
+	background: transparent;
+	color: #fff;
+	border-color: #fff;
+}
+
+body.trdsp-playground-pack .trdsp-theme-band {
+	width: 100%;
+	padding: 4rem 8vw;
+	box-sizing: border-box;
+}
+
+body.trdsp-playground-pack .trdsp-theme-cards {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 1.25rem;
+	margin: 0;
+}
+
+body.trdsp-playground-pack .trdsp-theme-cards .wp-block-column {
+	background: color-mix(in srgb, #fff 6%, var(--trdsp-bg));
+	border: 1px solid color-mix(in srgb, #fff 12%, var(--trdsp-bg));
+	padding: 1.5rem 1.25rem;
+}
+
+body.trdsp-playground-pack .trdsp-theme-cards h3 {
+	margin: 0 0 0.4rem;
+	font-size: 1.35rem;
+}
+
+body.trdsp-playground-pack .trdsp-theme-cards p,
+body.trdsp-playground-pack .trdsp-theme-trust {
+	margin: 0;
+	color: var(--trdsp-muted);
+}
+
+body.trdsp-playground-pack .trdsp-theme-trust {
+	text-align: center;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+	font-size: 0.78rem;
+	padding: 0 8vw 1rem;
+}
+
+body.trdsp-playground-pack .trdsp-theme-reviews {
+	margin: 0 8vw 0;
+	padding: 1.75rem 8vw;
+	background: color-mix(in srgb, var(--trdsp-accent) 16%, var(--trdsp-bg));
+	font-size: clamp(1.15rem, 2.2vw, 1.55rem);
+	font-family: var(--trdsp-display);
+	width: auto;
+}
+
+body.trdsp-playground-pack .trdsp-theme-service-list {
+	padding: 3.5rem 8vw;
+}
+
+body.trdsp-playground-pack .trdsp-theme-service-list h2 {
+	margin: 0 0 1rem;
+	font-size: clamp(1.6rem, 3vw, 2.2rem);
+}
+
+body.trdsp-playground-pack .trdsp-theme-services {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 0.75rem;
+}
+
+body.trdsp-playground-pack .trdsp-theme-services li {
+	padding: 0.85rem 1rem;
+	border-left: 3px solid var(--trdsp-accent);
+	background: color-mix(in srgb, #fff 5%, var(--trdsp-bg));
+}
+
+body.trdsp-playground-pack .trdsp-theme-book {
+	width: 100vw;
+	max-width: 100vw;
+	margin: 0;
+	padding: 4.5rem 8vw 5rem;
+	box-sizing: border-box;
+	background: #f0f0f1;
+	color: #1d2327;
+}
+
+body.trdsp-playground-pack .trdsp-theme-book h2 {
+	margin: 0 0 0.4rem;
+	font-size: clamp(2rem, 4vw, 3rem);
+	line-height: 1;
+}
+
+body.trdsp-playground-pack .trdsp-theme-book > p {
+	margin: 0 0 1.75rem;
+	color: #50575e;
+	max-width: 40rem;
+}
+
+body.trdsp-playground-pack .trdsp-theme-book .trdsp-booking {
+	max-width: none;
+	margin: 0;
+}
+
+body.trdsp-playground-pack .trdsp-theme-book .trdsp-form {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 0 1.5rem;
+}
+
+body.trdsp-playground-pack .trdsp-theme-book .trdsp-form p {
+	margin: 0 0 1rem;
+}
+
+body.trdsp-playground-pack .trdsp-theme-book .trdsp-form p:has(textarea),
+body.trdsp-playground-pack .trdsp-theme-book .trdsp-form p:has(.trdsp-submit),
+body.trdsp-playground-pack .trdsp-theme-book .trdsp-hint,
+body.trdsp-playground-pack .trdsp-theme-book .trdsp-slots,
+body.trdsp-playground-pack .trdsp-theme-book .trdsp-busy {
+	grid-column: 1 / -1;
+}
+
+body.trdsp-playground-pack .trdsp-theme-book .trdsp-form label {
+	font-weight: 700;
+	letter-spacing: 0.02em;
+}
+
+body.trdsp-playground-pack .trdsp-theme-book .trdsp-form input[type="text"],
+body.trdsp-playground-pack .trdsp-theme-book .trdsp-form input[type="email"],
+body.trdsp-playground-pack .trdsp-theme-book .trdsp-form input[type="datetime-local"],
+body.trdsp-playground-pack .trdsp-theme-book .trdsp-form select,
+body.trdsp-playground-pack .trdsp-theme-book .trdsp-form textarea {
+	width: 100%;
+	padding: 0.7rem 0.75rem;
+	border: 1px solid #c3c4c7;
+	border-radius: 0;
+	background: #fff;
+	box-sizing: border-box;
+}
+
+body.trdsp-playground-pack .trdsp-theme-book .trdsp-submit {
+	background: var(--trdsp-accent);
+	color: #fff;
+	padding: 0.85rem 1.4rem;
+	font-weight: 700;
+	letter-spacing: 0.03em;
+	text-transform: uppercase;
+}
+
+body.trdsp-playground-pack .trdsp-theme-footer {
+	padding: 1.5rem 8vw;
+	margin: 0;
+	background: #111416;
+	color: #f0f0f1;
+}
+
+@media (max-width: 800px) {
+	body.trdsp-playground-pack .trdsp-theme-cards,
+	body.trdsp-playground-pack .trdsp-theme-services,
+	body.trdsp-playground-pack .trdsp-theme-book .trdsp-form {
+		grid-template-columns: 1fr;
+	}
+
+	body.trdsp-playground-pack .trdsp-theme-header .inner {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+}
