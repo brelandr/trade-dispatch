@@ -22,6 +22,9 @@ rsync -az --delete \
 	--exclude '.DS_Store' \
 	--exclude 'node_modules/' \
 	--exclude 'vendor/' \
+	--exclude 'svn-checkout/' \
+	--exclude 'wporg-assets/' \
+	--exclude 'Dist/' \
 	--exclude 'tests/' \
 	--exclude 'phpunit.xml' \
 	--exclude 'phpcs.xml' \

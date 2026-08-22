@@ -31,6 +31,25 @@ A public booking stores a customer record and a requested job. A Customer-role W
 
 Assigned crew members may receive a next-day job list by email (title, time, and address) at their WordPress user email. Trade Dispatch → Emails lets you edit every plugin message (plain text, placeholders). Leave a field blank to use the default.
 
+Plugin home: https://tradedispatch.app
+Unminified source: https://github.com/brelandr/trade-dispatch
+
+== Try It Live - Preview This Plugin Instantly ==
+
+Open WordPress Playground with Trade Dispatch installed from WordPress.org, sample customers and jobs, and pages for `[trdsp_booking]` and `[trdsp_portal]`. Sign in as **admin** / **password** to use the office screens (Jobs, Customers, Estimates, Settings).
+
+[Preview on WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/brelandr/trade-dispatch/main/blueprint.json)
+
+The same blueprint ships in the plugin package as `blueprint.json` (repository root) and `assets/blueprints/blueprint.json`. After this listing is live, WordPress.org can also run the copy under the plugin’s directory assets for Live Preview.
+
+== Screenshots ==
+
+1. Jobs list — scheduled, in-progress, and requested work with customer and time.
+2. Job edit — address, gate notes, hazards, assignee, and office brief.
+3. Customers — names, phones, and property addresses on your WordPress site.
+4. Public booking form (`[trdsp_booking]`) — visitors request a visit without creating an account.
+5. Settings — business name, booking hours, and the customer portal page.
+
 == Installation ==
 
 1. Upload the `trade-dispatch` folder to `/wp-content/plugins/`.

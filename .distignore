@@ -39,6 +39,7 @@ vendor
 Dist
 dist
 svn-checkout
+wporg-assets
 
 # Tests and dev docs (readme.txt is the WordPress.org readme, not README.md)
 tests

@@ -75,6 +75,7 @@ RSYNC_EXCLUDES=(
 	--exclude='tests/'
 	--exclude='docs/'
 	--exclude='svn-checkout/'
+	--exclude='wporg-assets/'
 	--exclude='assets/src/'
 	--exclude='*.DS_Store'
 	--exclude='Thumbs.db'
@@ -170,6 +171,8 @@ trdsp_verify_zip() {
 			"${slug}/assets/js/trdsp-booking.js" \
 			"${slug}/assets/js/trdsp-admin-confirm.js" \
 			"${slug}/assets/css/trdsp-admin.css" \
+			"${slug}/assets/blueprints/blueprint.json" \
+			"${slug}/blueprint.json" \
 			"${slug}/languages/trade-dispatch.pot"
 		do
 			if ! printf '%s\n' "${listing}" | grep -qF "${must}"; then
