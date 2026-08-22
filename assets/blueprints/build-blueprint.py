@@ -48,7 +48,7 @@ add_filter(
 	'template_include',
 	static function ( $template ) {
 		if ( is_front_page() ) {
-			$home = WP_CONTENT_DIR . '/mu-plugins/trdsp-playground-home.php';
+			$home = WP_CONTENT_DIR . '/mu-plugins/trdsp-playground/home.php';
 			if ( is_readable( $home ) ) {
 				return $home;
 			}
@@ -61,9 +61,15 @@ add_filter(
 HOME = r"""<?php
 /**
  * Full-viewport pack homepage for Playground.
+ *
+ * Lives in mu-plugins/trdsp-playground/ so WordPress does not auto-load it
+ * as a must-use plugin (root *.php files run on every request).
  */
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
+}
+if ( ! did_action( 'template_redirect' ) ) {
+	return;
 }
 ?><!DOCTYPE html>
 <html <?php language_attributes(); ?>>
@@ -128,6 +134,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 """
 
 SEED = r"""<?php
+if ( ! defined( 'WP_USE_THEMES' ) ) {
+	define( 'WP_USE_THEMES', false );
+}
 require_once '/wordpress/wp-load.php';
 
 if ( ! class_exists( 'TRDSP_Customers' ) || ! class_exists( 'TRDSP_Jobs' ) ) {
@@ -301,7 +310,7 @@ if ( class_exists( 'TRDSP_Estimates' ) && ! is_wp_error( $done ) ) {
 	);
 }
 
-$home_id = (int) wp_insert_post(
+$home_post = wp_insert_post(
 	array(
 		'post_title'   => 'Home',
 		'post_name'    => 'home',
@@ -311,7 +320,7 @@ $home_id = (int) wp_insert_post(
 	),
 	true
 );
-$portal_id = (int) wp_insert_post(
+$portal_post = wp_insert_post(
 	array(
 		'post_title'   => 'Customer portal',
 		'post_name'    => 'customer-portal',
@@ -321,6 +330,8 @@ $portal_id = (int) wp_insert_post(
 	),
 	true
 );
+$home_id   = is_wp_error( $home_post ) ? 0 : (int) $home_post;
+$portal_id = is_wp_error( $portal_post ) ? 0 : (int) $portal_post;
 
 $settings = get_option( 'trdsp_settings', array() );
 if ( ! is_array( $settings ) ) {
@@ -360,7 +371,7 @@ blueprint = {
         },
         {
             "step": "writeFile",
-            "path": "/wordpress/wp-content/mu-plugins/trdsp-playground-home.php",
+            "path": "/wordpress/wp-content/mu-plugins/trdsp-playground/home.php",
             "data": HOME,
         },
         {"step": "runPHP", "code": SEED},
