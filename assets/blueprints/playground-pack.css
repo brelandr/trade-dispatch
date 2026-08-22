@@ -309,6 +309,56 @@ body.trdsp-playground-pack .trdsp-theme-book .trdsp-submit {
 	text-transform: uppercase;
 }
 
+body.trdsp-playground-pack .trdsp-theme-preview-logins {
+	width: 100%;
+	padding: 3.5rem 8vw 3rem;
+	box-sizing: border-box;
+	background: color-mix(in srgb, #fff 6%, var(--trdsp-bg));
+}
+
+body.trdsp-playground-pack .trdsp-theme-preview-logins h2 {
+	margin: 0 0 0.4rem;
+	font-size: clamp(1.6rem, 3vw, 2.2rem);
+}
+
+body.trdsp-playground-pack .trdsp-theme-preview-logins > p {
+	margin: 0 0 1.5rem;
+	color: var(--trdsp-muted);
+	max-width: 40rem;
+}
+
+body.trdsp-playground-pack .trdsp-theme-preview-cards {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 1.25rem;
+}
+
+body.trdsp-playground-pack .trdsp-theme-preview-cards > div {
+	padding: 1.5rem 1.25rem;
+	border: 1px solid color-mix(in srgb, #fff 12%, var(--trdsp-bg));
+	background: color-mix(in srgb, #fff 5%, var(--trdsp-bg));
+}
+
+body.trdsp-playground-pack .trdsp-theme-preview-cards h3 {
+	margin: 0 0 0.5rem;
+	font-size: 1.25rem;
+}
+
+body.trdsp-playground-pack .trdsp-theme-preview-cards p {
+	margin: 0 0 0.65rem;
+}
+
+body.trdsp-playground-pack .trdsp-theme-preview-cards code {
+	padding: 0.1rem 0.35rem;
+	background: color-mix(in srgb, #000 35%, var(--trdsp-bg));
+	color: #fff;
+}
+
+body.trdsp-playground-pack .trdsp-theme-preview-cards a {
+	color: #fff;
+	font-weight: 700;
+}
+
 body.trdsp-playground-pack .trdsp-theme-footer {
 	padding: 1.5rem 8vw;
 	margin: 0;
@@ -319,6 +369,7 @@ body.trdsp-playground-pack .trdsp-theme-footer {
 @media (max-width: 800px) {
 	body.trdsp-playground-pack .trdsp-theme-cards,
 	body.trdsp-playground-pack .trdsp-theme-services,
+	body.trdsp-playground-pack .trdsp-theme-preview-cards,
 	body.trdsp-playground-pack .trdsp-theme-book .trdsp-form {
 		grid-template-columns: 1fr;
 	}

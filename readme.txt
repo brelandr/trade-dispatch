@@ -36,7 +36,12 @@ Unminified source: https://github.com/brelandr/trade-dispatch
 
 == Try It Live - Preview This Plugin Instantly ==
 
-Open WordPress Playground with Trade Dispatch installed from WordPress.org. The homepage is a full-width shop pack (hero, services, and a full-bleed `[trdsp_booking]` form). Sample customers and jobs are already in the office. Sign in as **admin** / **password**, then use **Office** in the header — or open **Trade Dispatch** in wp-admin — for Jobs, Customers, Estimates, and Settings.
+Open WordPress Playground with Trade Dispatch installed from WordPress.org. The homepage is a full-width shop pack (hero, services, and a full-bleed `[trdsp_booking]` form). Sample customers, jobs, and an estimate are already loaded.
+
+Use one account at a time (log out to switch):
+
+* Office / dispatch: **admin** / **password** — Jobs, Customers, Estimates, and Alicia Brooks’s booking request. Header **Office** or Trade Dispatch in wp-admin.
+* Customer portal: **maya** / **password** — Maya Rivera’s upcoming mow, last visit, and a sent estimate. Header **Portal** after you sign in as Maya.
 
 [Preview on WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/brelandr/trade-dispatch/main/blueprint.json)
 

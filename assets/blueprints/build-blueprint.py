@@ -79,6 +79,7 @@ function trdsp_playground_render_home() {
 			<a href="#book">Book</a>
 			<a href="<?php echo esc_url( home_url( '/customer-portal/' ) ); ?>">Portal</a>
 			<a href="<?php echo esc_url( admin_url( 'admin.php?page=trade-dispatch' ) ); ?>">Office</a>
+			<a href="#preview-logins">Logins</a>
 		</nav>
 	</div></header>
 	<main class="trdsp-theme-main">
@@ -88,10 +89,28 @@ function trdsp_playground_render_home() {
 				<p>Scheduled lawn care for Austin yards. Book a visit or open the customer portal.</p>
 				<div class="wp-block-buttons">
 					<div class="wp-block-button"><a class="wp-block-button__link" href="#book">Book a visit</a></div>
-					<div class="wp-block-button is-style-outline"><a class="wp-block-button__link" href="<?php echo esc_url( home_url( '/customer-portal/' ) ); ?>">Customer portal</a></div>
+					<div class="wp-block-button is-style-outline"><a class="wp-block-button__link" href="#preview-logins">Office &amp; portal logins</a></div>
 				</div>
 			</div>
 		</div>
+		<section class="trdsp-theme-preview-logins" id="preview-logins">
+			<h2>Preview logins</h2>
+			<p>This Playground is a demo shop with sample customers and jobs. Use one account at a time — log out to switch.</p>
+			<div class="trdsp-theme-preview-cards">
+				<div>
+					<h3>Office (dispatch)</h3>
+					<p><code>admin</code> / <code>password</code></p>
+					<p>Jobs, customers, estimates, and the booking request from Alicia Brooks.</p>
+					<p><a href="<?php echo esc_url( admin_url( 'admin.php?page=trade-dispatch' ) ); ?>">Open the office</a></p>
+				</div>
+				<div>
+					<h3>Customer portal</h3>
+					<p><code>maya</code> / <code>password</code></p>
+					<p>Maya Rivera — upcoming mow, last visit, and a sent estimate.</p>
+					<p><a href="<?php echo esc_url( wp_logout_url( wp_login_url( home_url( '/customer-portal/' ) ) ) ); ?>">Log out, then sign in as Maya</a></p>
+				</div>
+			</div>
+		</section>
 		<div class="trdsp-theme-band" id="services">
 			<div class="wp-block-columns trdsp-theme-cards">
 				<div class="wp-block-column"><h3>Weekly mow</h3><p>Edge, blow, and a consistent route.</p></div>
@@ -127,7 +146,7 @@ function trdsp_playground_render_home() {
 """
 
 SEED = r"""<?php
-// trdsp playground seed v3
+// trdsp playground seed v4
 foreach ( array( '/wordpress/wp-content/mu-plugins/trdsp-playground-home.php' ) as $trdsp_stale ) {
 	if ( is_file( $trdsp_stale ) ) {
 		unlink( $trdsp_stale );
@@ -229,6 +248,21 @@ $brooks = TRDSP_Customers::save(
 
 if ( is_wp_error( $rivera ) || is_wp_error( $chen ) || is_wp_error( $brooks ) ) {
 	return;
+}
+
+if ( class_exists( 'TRDSP_Roles' ) ) {
+	TRDSP_Roles::maybe_register();
+}
+if ( ! username_exists( 'maya' ) && ! email_exists( 'maya.rivera@example.com' ) ) {
+	wp_insert_user(
+		array(
+			'user_login'   => 'maya',
+			'user_email'   => 'maya.rivera@example.com',
+			'user_pass'    => 'password',
+			'display_name' => 'Maya Rivera',
+			'role'         => 'trdsp_customer',
+		)
+	);
 }
 
 $tomorrow  = gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS + 9 * HOUR_IN_SECONDS );
