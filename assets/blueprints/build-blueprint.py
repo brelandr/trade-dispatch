@@ -13,6 +13,9 @@ CSS = (HERE / "playground-pack.css").read_text(encoding="utf-8")
 MU_PLUGIN = r"""<?php
 /**
  * Playground-only pack chrome for Trade Dispatch Live Preview.
+ *
+ * Homepage HTML lives in this file (hooks only at load time). Do not add
+ * another .php file under mu-plugins/ — WordPress auto-runs those.
  */
 add_filter(
 	'body_class',
@@ -44,34 +47,22 @@ add_action(
 	}
 );
 
-add_filter(
-	'template_include',
-	static function ( $template ) {
-		if ( is_front_page() ) {
-			$home = WP_CONTENT_DIR . '/mu-plugins/trdsp-playground/home.php';
-			if ( is_readable( $home ) ) {
-				return $home;
-			}
+add_action(
+	'template_redirect',
+	static function () {
+		if ( ! is_front_page() ) {
+			return;
 		}
-		return $template;
+		trdsp_playground_render_home();
+		exit;
 	}
 );
-"""
 
-HOME = r"""<?php
 /**
- * Full-viewport pack homepage for Playground.
- *
- * Lives in mu-plugins/trdsp-playground/ so WordPress does not auto-load it
- * as a must-use plugin (root *.php files run on every request).
+ * Full-viewport pack homepage.
  */
-if ( ! defined( 'ABSPATH' ) ) {
-	exit;
-}
-if ( ! did_action( 'template_redirect' ) ) {
-	return;
-}
-?><!DOCTYPE html>
+function trdsp_playground_render_home() {
+	?><!DOCTYPE html>
 <html <?php language_attributes(); ?>>
 <head>
 	<meta charset="<?php bloginfo( 'charset' ); ?>" />
@@ -131,9 +122,17 @@ if ( ! did_action( 'template_redirect' ) ) {
 <?php wp_footer(); ?>
 </body>
 </html>
+	<?php
+}
 """
 
 SEED = r"""<?php
+// trdsp playground seed v3
+foreach ( array( '/wordpress/wp-content/mu-plugins/trdsp-playground-home.php' ) as $trdsp_stale ) {
+	if ( is_file( $trdsp_stale ) ) {
+		unlink( $trdsp_stale );
+	}
+}
 if ( ! defined( 'WP_USE_THEMES' ) ) {
 	define( 'WP_USE_THEMES', false );
 }
@@ -368,11 +367,6 @@ blueprint = {
             "step": "writeFile",
             "path": "/wordpress/wp-content/mu-plugins/trdsp-playground-pack.php",
             "data": MU_PLUGIN,
-        },
-        {
-            "step": "writeFile",
-            "path": "/wordpress/wp-content/mu-plugins/trdsp-playground/home.php",
-            "data": HOME,
         },
         {"step": "runPHP", "code": SEED},
     ],
